@@ -2293,6 +2293,8 @@
         }
       }
     },
+    "Add to List" : {},
+    "Add to List…" : {},
     "Adds a For You row to What's On, with channels picked from what you watch. It learns on this Apple TV only." : {
       "localizations" : {
         "de" : {
@@ -11058,6 +11060,7 @@
       }
     },
     "List" : {},
+    "List Name" : {},
     "Live" : {
       "localizations" : {
         "de" : {
@@ -12122,6 +12125,8 @@
         }
       }
     },
+    "New List" : {},
+    "New List…" : {},
     "New Playlist" : {
       "localizations" : {
         "de" : {
@@ -13870,6 +13875,7 @@
         }
       }
     },
+    "Pin" : {},
     "Pin to %@" : {
       "localizations" : {
         "de" : {
@@ -15417,6 +15423,7 @@
         }
       }
     },
+    "Rename List" : {},
     "Reset Home Rows?" : {
       "localizations" : {
         "de" : {
@@ -20387,6 +20394,7 @@
         }
       }
     },
+    "This removes the list from this Apple TV. Its channels stay where they are." : {},
     "This trailer plays in the YouTube app." : {
       "localizations" : {
         "de" : {

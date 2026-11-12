@@ -122,6 +122,13 @@ final class LiveListViewController: UIViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateEmptyState() }
             .store(in: &cancellables)
+        // The viewer's own lists and pins, changed from a hold menu here or elsewhere.
+        let lists = LiveChannelListStore.shared
+        lists.$lists.map { _ in () }.merge(with: lists.$pinnedCategoryKeys.map { _ in () })
+            .dropFirst(2)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.rebuild() }
+            .store(in: &cancellables)
 
         Task { @MainActor in
             if store.channels.isEmpty { await store.loadChannels() }
@@ -354,6 +361,8 @@ final class LiveListViewController: UIViewController {
         }
 
         channelView.addGestureRecognizer(TileLongPress.makeRecognizer(target: self, action: #selector(handleLongPress(_:))))
+        categoryView.addGestureRecognizer(TileLongPress.makeRecognizer(target: self,
+                                                                       action: #selector(handleCategoryLongPress(_:))))
         guideSwipe = DirectionalInputBinding(
             gatedSwipesOn: channelView,
             directions: [.right],
@@ -579,6 +588,43 @@ final class LiveListViewController: UIViewController {
             onWatch: { [weak self] channel in self?.play(channel) },
             onMultiview: { [weak self] channel in self?.presentMultiview(adopting: nil, adding: channel) }
         )
+    }
+
+    /// Held Select on a category: pin a group to the top, or rename or
+    /// delete one of the viewer's own lists.
+    @objc private func handleCategoryLongPress(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.state == .began,
+              let indexPath = TileLongPress.focusedCell(in: categoryView),
+              let id = categoryData.itemIdentifier(for: indexPath),
+              let category = list.category(id) else { return }
+        let store = LiveChannelListStore.shared
+        var sections: [[TileMenuAction]] = []
+        if let key = category.pinKey {
+            if store.isPinned(key) {
+                sections.append([TileMenuAction(title: "Unpin", systemImage: "pin.slash") { store.togglePin(key) }])
+            } else {
+                sections.append([TileMenuAction(title: "Pin", systemImage: "pin") { store.togglePin(key) }])
+            }
+        }
+        if case .list(let listId) = category.kind {
+            sections.append([TileMenuAction(title: "Rename", systemImage: "pencil") { [weak self] in
+                guard let self else { return }
+                LiveProgramMenu.presentNameEntry(title: "Rename List", initialText: category.title, from: self) { name in
+                    store.rename(listId, to: name)
+                }
+            }])
+            sections.append([TileMenuAction(title: "Delete", systemImage: "trash", destructive: true) { [weak self] in
+                self?.present(ConfirmationPopupViewController(
+                    title: String(localized: "Delete \u{201C}\(category.title)\u{201D}?"),
+                    message: String(localized: "This removes the list from this Apple TV. Its channels stay where they are."),
+                    confirmTitle: String(localized: "Delete"), destructive: true,
+                    onConfirm: { store.delete(listId) }), animated: true)
+            }])
+        }
+        guard !sections.isEmpty else { return }
+        let frame = categoryView.cellForItem(at: indexPath).map { $0.convert($0.bounds, to: nil) }
+        present(TileMenuPopupViewController(sections: sections, sourceFrame: frame,
+                                            header: TileMenuHeader(title: category.title)), animated: false)
     }
 
     /// Full screen on the glass rail, as from What's On. No corner player
