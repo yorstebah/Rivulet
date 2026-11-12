@@ -26,6 +26,7 @@ struct GuideLayoutView: View {
     var onExit: ((_ group: String?, _ channelId: String?) -> Void)?
 
     @StateObject private var dataStore = LiveTVDataStore.shared
+    @ObservedObject private var channelLists = LiveChannelListStore.shared
 
     /// Selected category tab. nil = "All Channels"; otherwise an M3U group title.
     @State private var selectedGroup: String?
@@ -77,19 +78,44 @@ struct GuideLayoutView: View {
             groups: LiveGroupOrder.titles(in: sourceChannels, sourceOrder: dataStore.sources.map(\.id)),
             sourceNames: dataStore.sources.map(\.displayName).filter { sourceTabs[$0] != nil },
             // Offered only when there are favourites, so no empty tab.
-            hasFavorites: !dataStore.favorites(in: sourceChannels).isEmpty)
+            hasFavorites: !dataStore.favorites(in: sourceChannels).isEmpty,
+            lists: ownLists.map(\.name),
+            pinnedGroups: pinnedGroupTitles)
     }
 
-    nonisolated static func tabTitles(groups: [String], sourceNames: [String], hasFavorites: Bool) -> [String] {
+    /// The viewer's own lists with a channel here, each a tab after Favorites.
+    private var ownLists: [LiveChannelList] {
+        let present = Set(sourceChannels.map(\.id))
+        return channelLists.lists.filter { $0.channelIds.contains(where: present.contains) }
+    }
+
+    /// Titles of the pinned groups here, in pin order: their tabs come next.
+    private var pinnedGroupTitles: [String] {
+        var titleByKey: [String: String] = [:]
+        for channel in sourceChannels {
+            guard let title = LiveGroupOrder.trimmed(channel.groupTitle) else { continue }
+            titleByKey[LiveCategoryList.pinKey(sourceId: channel.sourceId, title: title)] = title
+        }
+        return channelLists.pinnedCategoryKeys.compactMap { titleByKey[$0] }
+    }
+
+    /// Favorites, the viewer's own lists and pinned groups lead; then sources,
+    /// then the rest of the groups in the source's order. A list wins a name
+    /// it shares with a group.
+    nonisolated static func tabTitles(groups: [String], sourceNames: [String], hasFavorites: Bool,
+                                      lists: [String] = [], pinnedGroups pinnedTitles: [String] = []) -> [String] {
         var seen: Set<String> = []
         let sources = sourceNames.filter { seen.insert($0).inserted }
         let named = Set(groups.filter { !$0.isEmpty })
         let pinned = pinnedGroups.filter { hasFavorites || named.contains($0) }
+        var leadSeen = Set(pinned)
+        let own = lists.filter { !$0.isEmpty && leadSeen.insert($0).inserted }
+        let pins = pinnedTitles.filter { named.contains($0) && leadSeen.insert($0).inserted }
         var restSeen: Set<String> = []
         let rest = groups.filter {
-            !$0.isEmpty && !sources.contains($0) && !pinned.contains($0) && restSeen.insert($0).inserted
+            !$0.isEmpty && !sources.contains($0) && !leadSeen.contains($0) && restSeen.insert($0).inserted
         }
-        return pinned + sources.filter { !pinned.contains($0) } + rest
+        return pinned + own + pins + sources.filter { !leadSeen.contains($0) } + rest
     }
 
     /// Channels shown in the grid: source-filtered, then category-filtered.
@@ -105,6 +131,11 @@ struct GuideLayoutView: View {
         // every other tab inherits.
         if group == Self.favouritesTab {
             return dataStore.favorites(in: sourceChannels)
+        }
+        // One of the viewer's own lists: its channels, in its order.
+        if let list = ownLists.first(where: { $0.name == group }) {
+            let byId = Dictionary(sourceChannels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            return list.channelIds.compactMap { byId[$0] }
         }
         if let ids = sourceTabs[group] {
             return sourceChannels.filter { ids.contains($0.sourceId) }

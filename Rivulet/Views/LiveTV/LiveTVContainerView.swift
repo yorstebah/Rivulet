@@ -111,17 +111,22 @@ private struct LiveListBridge: UIViewControllerRepresentable {
     func updateUIViewController(_ list: LiveListViewController, context: Context) {}
 
     /// The guide's tab title for a target: nil is All Channels.
-    static func tabTitle(_ tab: LiveGuideTarget.Tab) -> String? {
+    @MainActor static func tabTitle(_ tab: LiveGuideTarget.Tab) -> String? {
         switch tab {
         case .all: return nil
         case .favorites: return GuideLayoutView.favouritesTab
         case .group(let title): return title
+        case .list(let listId): return LiveChannelListStore.shared.list(listId)?.name
         }
     }
 
-    static func tab(_ title: String?) -> LiveGuideTarget.Tab {
+    /// A tab title back to a target. The guide matches Favorites, then the
+    /// viewer's lists, then groups, so this does too.
+    @MainActor static func tab(_ title: String?) -> LiveGuideTarget.Tab {
         guard let title else { return .all }
-        return title == GuideLayoutView.favouritesTab ? .favorites : .group(title)
+        if title == GuideLayoutView.favouritesTab { return .favorites }
+        if let list = LiveChannelListStore.shared.lists.first(where: { $0.name == title }) { return .list(list.id) }
+        return .group(title)
     }
 }
 

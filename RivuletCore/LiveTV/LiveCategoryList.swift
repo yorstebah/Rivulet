@@ -5,10 +5,11 @@
 //  LiveCategoryList.swift
 //  Rivulet
 //
-//  The List layout's categories: Recently Watched, Favorites and All Channels
-//  first, then each source's groups in the source's own order (#568). With two
-//  or more sources in view, each gets a section of its own, headed by its name,
-//  with its own All Channels. Data only; each app draws it its own way.
+//  The List layout's categories: Recently Watched, Favorites, the viewer's own
+//  lists and All Channels first, then the pinned groups, then each source's
+//  groups in the source's own order (#568). With two or more sources in view,
+//  each gets a section of its own, headed by its name, with its own All
+//  Channels. Data only; each app draws it its own way.
 //
 
 import Foundation
@@ -24,6 +25,8 @@ struct LiveCategory: Identifiable, Hashable {
         case sourceHeader
         /// A channel group, by its trimmed title.
         case group(String)
+        /// One of the viewer's own lists, by its id (`LiveChannelList`).
+        case list(String)
     }
 
     let id: String
@@ -33,6 +36,11 @@ struct LiveCategory: Identifiable, Hashable {
     /// The section's source, nil for the rows over every source in view.
     let sourceId: String?
     let channelCount: Int
+    /// A group's key for pinning (`LiveCategoryList.pinKey`), on the group and on its pinned copy.
+    var pinKey: String? = nil
+
+    /// The copy of a pinned group near the top, rather than the group in its section.
+    var isPinnedCopy: Bool { id.hasPrefix("pin|") }
 }
 
 /// Which guide a category opens: the source it is limited to and the tab.
@@ -42,6 +50,8 @@ struct LiveGuideTarget: Hashable {
         case favorites
         /// A tab by its title: a channel group, or a source's name in a combined guide.
         case group(String)
+        /// One of the viewer's own lists, by its id.
+        case list(String)
     }
 
     let sourceId: String?
@@ -88,6 +98,10 @@ struct LiveCategoryList {
         var sourceIdFilter: String?
         /// Sources whose sections are folded to their header.
         var collapsedSourceIds: Set<String> = []
+        /// The viewer's own lists, in their order.
+        var lists: [LiveChannelList] = []
+        /// Pinned groups (`pinKey`), in the order they were pinned.
+        var pinnedKeys: [String] = []
     }
 
     /// The column's rows in order, source headers included.
@@ -106,14 +120,16 @@ struct LiveCategoryList {
         var rows: [LiveCategory] = []
         var folded: Set<String> = []
 
-        func add(_ kind: LiveCategory.Kind, title: String, sourceId: String?, positions: [Int]) {
-            let id = Self.id(kind, sourceId: sourceId)
+        func add(_ kind: LiveCategory.Kind, title: String, sourceId: String?, positions: [Int],
+                 id: String? = nil, pinKey: String? = nil) {
+            let id = id ?? Self.id(kind, sourceId: sourceId)
             // A merged lineup can list a channel twice; one row each.
             var seen = Set<String>()
             let unique = positions.filter { seen.insert(lineup[$0].id).inserted }
             guard kind == .sourceHeader || !unique.isEmpty else { return }
             members[id] = unique
-            rows.append(LiveCategory(id: id, kind: kind, title: title, sourceId: sourceId, channelCount: unique.count))
+            rows.append(LiveCategory(id: id, kind: kind, title: title, sourceId: sourceId,
+                                     channelCount: unique.count, pinKey: pinKey))
         }
 
         var position: [String: Int] = [:]
@@ -126,6 +142,10 @@ struct LiveCategoryList {
                                                   unfavorited: input.unfavoritedIds)
         add(.favorites, title: String(localized: "Favorites"), sourceId: nil,
             positions: favorites.compactMap { position[$0.id] })
+        // The viewer's own lists, each in the order its channels were added.
+        for list in input.lists {
+            add(.list(list.id), title: list.name, sourceId: nil, positions: list.channelIds.compactMap { position[$0] })
+        }
         add(.all, title: String(localized: "All Channels"), sourceId: nil, positions: Array(lineup.indices))
 
         // Sections when two or more sources are in view, as the guide's source
@@ -136,6 +156,21 @@ struct LiveCategoryList {
         let present = known.filter { bySource[$0] != nil }
             + bySource.keys.filter { !known.contains($0) }.sorted()
         let names = Dictionary(input.sources.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let sectioned = filter == nil && present.count > 1
+
+        // Pinned groups, above the sections. A pin names one source's group,
+        // so a group two sources share is pinned for one of them only.
+        var byKey: [String: (title: String, sourceId: String, positions: [Int])] = [:]
+        for (index, channel) in lineup.enumerated() {
+            guard let title = LiveGroupOrder.trimmed(channel.groupTitle) else { continue }
+            byKey[Self.pinKey(sourceId: channel.sourceId, title: title),
+                  default: (title, channel.sourceId, [])].positions.append(index)
+        }
+        for key in input.pinnedKeys {
+            guard let group = byKey[key] else { continue }
+            add(.group(group.title), title: group.title, sourceId: sectioned ? group.sourceId : nil,
+                positions: group.positions, id: "pin|\(key)", pinKey: key)
+        }
 
         func addGroups(of positions: [Int], sourceId: String?) {
             var byGroup: [String: [Int]] = [:]
@@ -144,11 +179,13 @@ struct LiveCategoryList {
                 byGroup[title, default: []].append(index)
             }
             for title in LiveGroupOrder.titles(in: positions.map { lineup[$0] }) {
-                add(.group(title), title: title, sourceId: sourceId, positions: byGroup[title] ?? [])
+                let groupPositions = byGroup[title] ?? []
+                let key = groupPositions.first.map { Self.pinKey(sourceId: lineup[$0].sourceId, title: title) }
+                add(.group(title), title: title, sourceId: sourceId, positions: groupPositions, pinKey: key)
             }
         }
 
-        if filter == nil && present.count > 1 {
+        if sectioned {
             for sourceId in present {
                 let positions = bySource[sourceId] ?? []
                 add(.sourceHeader, title: names[sourceId] ?? "", sourceId: sourceId, positions: positions)
@@ -175,7 +212,13 @@ struct LiveCategoryList {
         case .all: return "all|\(source)"
         case .sourceHeader: return "source|\(source)"
         case .group(let title): return "group|\(source)|\(title)"
+        case .list(let listId): return "list|\(listId)"
         }
+    }
+
+    /// A group's key for pinning: its source and title, the same in every view.
+    static func pinKey(sourceId: String, title: String) -> String {
+        "\(sourceId)|\(title)"
     }
 
     // MARK: - Reading
@@ -201,6 +244,7 @@ struct LiveCategoryList {
         case .favorites: return LiveGuideTarget(sourceId: sourceIdFilter, tab: .favorites)
         case .all: return LiveGuideTarget(sourceId: source, tab: .all)
         case .group(let title): return LiveGuideTarget(sourceId: source, tab: .group(title))
+        case .list(let listId): return LiveGuideTarget(sourceId: sourceIdFilter, tab: .list(listId))
         case .sourceHeader: return nil
         }
     }
@@ -214,6 +258,8 @@ struct LiveCategoryList {
         switch target.tab {
         case .favorites:
             match = category(Self.id(.favorites, sourceId: nil))
+        case .list(let listId):
+            match = category(Self.id(.list(listId), sourceId: nil))
         case .all:
             match = category(Self.id(.all, sourceId: source))
         case .group(let title):
@@ -223,8 +269,9 @@ struct LiveCategoryList {
                 // A source's own tab in the combined guide.
                 match = category(Self.id(.all, sourceId: header.sourceId))
             } else {
-                // A group the combined guide merges: the first source that has it.
-                match = allRows.first { $0.kind == .group(title) }
+                // A group the combined guide merges: the first source that has
+                // it, in its section rather than its pinned copy.
+                match = allRows.first { $0.kind == .group(title) && !$0.isPinnedCopy }
             }
         }
         return match?.id
@@ -239,6 +286,8 @@ extension LiveTVDataStore {
             sources: sources.map { (id: $0.id, name: $0.displayName) },
             favoriteIds: favoriteIds, unfavoritedIds: unfavoritedIds,
             recentChannelIds: recentChannelIds,
-            sourceIdFilter: sourceIdFilter, collapsedSourceIds: collapsedSourceIds))
+            sourceIdFilter: sourceIdFilter, collapsedSourceIds: collapsedSourceIds,
+            lists: LiveChannelListStore.shared.lists,
+            pinnedKeys: LiveChannelListStore.shared.pinnedCategoryKeys))
     }
 }

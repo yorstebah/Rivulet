@@ -21,10 +21,11 @@ final class LiveCategoryListTests: XCTestCase {
 
     private func build(_ channels: [UnifiedChannel], sources: [(id: String, name: String)] = [("x", "Provider A")],
                        favorites: [String] = [], recents: [String] = [], filter: String? = nil,
-                       collapsed: Set<String> = []) -> LiveCategoryList {
+                       collapsed: Set<String> = [], lists: [LiveChannelList] = [],
+                       pins: [String] = []) -> LiveCategoryList {
         LiveCategoryList.build(LiveCategoryList.Input(
             channels: channels, sources: sources, favoriteIds: favorites, recentChannelIds: recents,
-            sourceIdFilter: filter, collapsedSourceIds: collapsed))
+            sourceIdFilter: filter, collapsedSourceIds: collapsed, lists: lists, pinnedKeys: pins))
     }
 
     private func kinds(_ list: LiveCategoryList) -> [LiveCategory.Kind] { list.categories.map(\.kind) }
@@ -156,6 +157,58 @@ final class LiveCategoryListTests: XCTestCase {
         XCTAssertEqual(list.categoryId(for: LiveGuideTarget(sourceId: nil, tab: .group("Provider B"))), "all|m")
         XCTAssertEqual(list.categoryId(for: LiveGuideTarget(sourceId: nil, tab: .group("Kids"))), "group|x|Kids")
         XCTAssertNil(list.categoryId(for: LiveGuideTarget(sourceId: "m", tab: .group("Gone"))))
+    }
+
+    // MARK: - Own lists and pins
+
+    func test_ownLists_followFavorites_inTheirOwnOrder_andEmptyOnesAreLeftOut() {
+        let lists = [LiveChannelList(id: "L1", name: "Evening", channelIds: ["x:c", "x:a", "x:gone"]),
+                     LiveChannelList(id: "L2", name: "Empty", channelIds: ["x:gone"])]
+        let list = build([ch("a", "S"), ch("b", "S"), ch("c", "N")], favorites: ["x:b"], lists: lists)
+        XCTAssertEqual(kinds(list), [.favorites, .list("L1"), .all, .group("S"), .group("N")])
+        XCTAssertEqual(names(list.channels(in: "list|L1")), ["c", "a"])
+        XCTAssertEqual(list.category("list|L1")?.title, "Evening")
+    }
+
+    func test_pinnedGroup_getsACopyAboveTheSections_andKeepsItsPlace() {
+        let channels = [ch("a", "Kids", source: "x"), ch("b", "Kids", source: "m"), ch("c", "Music", source: "m")]
+        let sources: [(id: String, name: String)] = [("x", "Provider A"), ("m", "Provider B")]
+        let key = LiveCategoryList.pinKey(sourceId: "m", title: "Kids")
+        let list = build(channels, sources: sources, pins: [key])
+        XCTAssertEqual(list.categories.map(\.id),
+                       ["all|", "pin|\(key)", "source|x", "all|x", "group|x|Kids", "source|m", "all|m", "group|m|Kids",
+                        "group|m|Music"])
+        // Only Provider B's Kids, and the guide limited to it.
+        XCTAssertEqual(names(list.channels(in: "pin|\(key)")), ["b"])
+        XCTAssertEqual(list.guideTarget(for: "pin|\(key)"), LiveGuideTarget(sourceId: "m", tab: .group("Kids")))
+        XCTAssertEqual(list.category("group|m|Kids")?.pinKey, key)
+        XCTAssertTrue(list.category("pin|\(key)")?.isPinnedCopy == true)
+    }
+
+    func test_pinKey_isTheSameWithAndWithoutSections() {
+        let key = LiveCategoryList.pinKey(sourceId: "x", title: "Kids")
+        XCTAssertEqual(build([ch("a", "Kids")]).category("group||Kids")?.pinKey, key)
+        let sectioned = build([ch("a", "Kids"), ch("b", "Kids", source: "m")],
+                              sources: [("x", "A"), ("m", "B")])
+        XCTAssertEqual(sectioned.category("group|x|Kids")?.pinKey, key)
+    }
+
+    func test_pinOfAGroupThatIsGone_showsNothing() {
+        XCTAssertNil(build([ch("a", "Kids")], pins: ["x|Gone"]).categories.first { $0.isPinnedCopy })
+    }
+
+    func test_ownList_opensItsGuideTab_andComesBackToIt() {
+        let lists = [LiveChannelList(id: "L1", name: "Evening", channelIds: ["x:a"])]
+        let list = build([ch("a", "S")], lists: lists)
+        XCTAssertEqual(list.guideTarget(for: "list|L1"), LiveGuideTarget(sourceId: nil, tab: .list("L1")))
+        XCTAssertEqual(list.categoryId(for: LiveGuideTarget(sourceId: nil, tab: .list("L1"))), "list|L1")
+    }
+
+    func test_backFromGuide_onAPinnedGroup_landsOnTheGroupInItsSection() {
+        let channels = [ch("a", "Kids", source: "x"), ch("b", "Kids", source: "m")]
+        let list = build(channels, sources: [("x", "A"), ("m", "B")],
+                         pins: [LiveCategoryList.pinKey(sourceId: "m", title: "Kids")])
+        XCTAssertEqual(list.categoryId(for: LiveGuideTarget(sourceId: nil, tab: .group("Kids"))), "group|x|Kids")
     }
 
     // MARK: - Now and next
