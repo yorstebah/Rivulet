@@ -1294,9 +1294,13 @@ extension ShellSidebarViewController {
         }
         if SidebarArrangement.isLiveTV(key) {
             let current = LiveTVLayout(rawValue: UserDefaults.standard.string(forKey: "liveTVLayout") ?? "") ?? .fallback
-            let layouts = [LiveTVLayout.browse, .guide].map { layout -> TileMenuAction in
-                TileMenuAction(verbatim: layout.description,
-                               systemImage: layout == current ? "checkmark" : (layout == .guide ? "list.bullet.rectangle" : "square.grid.2x2")) {
+            let layouts = [LiveTVLayout.browse, .guide, .list].map { layout -> TileMenuAction in
+                let symbol = switch layout {
+                case .browse: "square.grid.2x2"
+                case .guide: "list.bullet.rectangle"
+                case .list: "list.bullet"
+                }
+                return TileMenuAction(verbatim: layout.description, systemImage: layout == current ? "checkmark" : symbol) {
                     UserDefaults.standard.set(layout.rawValue, forKey: "liveTVLayout")
                 }
             }
