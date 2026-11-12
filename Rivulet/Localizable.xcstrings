@@ -4749,6 +4749,8 @@
         }
       }
     },
+    "Search channels" : {},
+    "Search for a channel by name or number, or for what is on now." : {},
     "Select to show or hide this library in the sidebar and on Home. Hold Select to move it up or down." : {
       "localizations" : {
         "de" : {
