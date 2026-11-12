@@ -104,8 +104,9 @@ enum ShellPillMetrics {
 /// System row coloring: focused = solid white capsule, dark content; selected
 /// but unfocused = translucent capsule, full-white content; otherwise bare, dim.
 /// Resting 0.7 is the TV app's value; its focused 0.9 / 0.7 pair rides a
-/// PlusL / PlusD layer this sidebar does not have.
-private func sidebarRowColors(focused: Bool, selected: Bool) -> (background: UIColor, content: UIColor) {
+/// PlusL / PlusD layer this sidebar does not have. The List layout's
+/// category rows share it.
+func sidebarRowColors(focused: Bool, selected: Bool) -> (background: UIColor, content: UIColor) {
     if focused { return (UIColor.white.withAlphaComponent(0.91), .black) }
     if selected { return (UIColor.white.withAlphaComponent(0.1), .white) }
     return (.clear, UIColor.white.withAlphaComponent(0.7))
