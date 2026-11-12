@@ -201,7 +201,9 @@ final class LiveChannelRowCell: UICollectionViewCell {
         // Channel on the left third, programme on the rest.
         let nameX = logo.width + 24
         let programX = max(nameX + 320, bounds.width * 0.42)
-        let nameWidth = programX - nameX - 32
+        // With nothing from the guide the row is the channel alone, so its name takes the width.
+        let hasGuide = programLabel.text != nil || nextLabel.text != nil
+        let nameWidth = hasGuide ? programX - nameX - 32 : bounds.width - nameX - 16
         let textTop = groupLabel.text == nil ? (bounds.height - 30) / 2 : 28
         nameLabel.frame = CGRect(x: nameX, y: textTop, width: nameWidth, height: 30)
         groupLabel.frame = CGRect(x: nameX, y: textTop + 34, width: nameWidth, height: 24)
