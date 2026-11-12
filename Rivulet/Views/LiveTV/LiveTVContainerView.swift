@@ -5,8 +5,8 @@
 //  LiveTVContainerView.swift
 //  Rivulet
 //
-//  Container view that switches between the Guide and What's On layouts
-//  based on user settings
+//  Container view that switches between the Guide, What's On and List
+//  layouts based on user settings
 //
 
 import SwiftUI
@@ -19,11 +19,14 @@ enum LiveTVLayout: String, CaseIterable, CustomStringConvertible {
     case guide = "Guide"
     /// Shelves of live cards, after the Apple TV app (UIKit).
     case browse = "Browse"
+    /// Categories beside a channel list (UIKit).
+    case list = "List"
 
     var description: String {
         switch self {
         case .guide: return String(localized: "Guide")
         case .browse: return String(localized: "What's On")
+        case .list: return String(localized: "List")
         }
     }
 
@@ -53,6 +56,10 @@ struct LiveTVContainerView: View {
                 LiveBrowseBridge(sourceIdFilter: sourceIdFilter)
                     .ignoresSafeArea()
                     .id(sourceIdFilter ?? "all")
+            case .list:
+                LiveListBridge(sourceIdFilter: sourceIdFilter)
+                    .ignoresSafeArea()
+                    .id(sourceIdFilter ?? "all")
             }
         }
         .task {
@@ -78,6 +85,17 @@ private struct LiveBrowseBridge: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: LiveBrowseViewController, context: Context) {}
+}
+
+/// Hosts the UIKit List layout, rebuilt per source like `LiveBrowseBridge`.
+private struct LiveListBridge: UIViewControllerRepresentable {
+    let sourceIdFilter: String?
+
+    func makeUIViewController(context: Context) -> LiveListViewController {
+        LiveListViewController(sourceIdFilter: sourceIdFilter)
+    }
+
+    func updateUIViewController(_ uiViewController: LiveListViewController, context: Context) {}
 }
 
 #Preview {
