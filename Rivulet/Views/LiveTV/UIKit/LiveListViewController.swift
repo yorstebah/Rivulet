@@ -9,8 +9,9 @@
 //  one's channels on the right with what each airs now. Selection follows
 //  focus, as in the guide's category pills. Plays and opens the programme menu
 //  as What's On does; there is no corner player here, so Back ends a channel.
-//  Right on a channel opens the guide for its category (`onOpenGuide`); the
-//  host brings the list back on the guide's tab and channel (`LiveListReturn`).
+//  Right on a channel opens the guide for its category (`onOpenGuide`). The
+//  list stays in place, hidden, while the guide is up, so on the way back its
+//  row is there to take focus (`returnFromGuide`).
 //
 
 import UIKit
@@ -18,9 +19,11 @@ import Combine
 
 /// Where the list comes back to from the guide: the guide's tab, and the
 /// channel focused there.
-struct LiveListReturn {
+struct LiveListReturn: Equatable {
     let target: LiveGuideTarget
     let channelId: String?
+    /// Each return is applied once.
+    let id = UUID()
 }
 
 final class LiveListViewController: UIViewController {
@@ -43,11 +46,9 @@ final class LiveListViewController: UIViewController {
     private let sourceIdFilter: String?
     /// Right on a channel: the guide for the selected category, on that channel.
     var onOpenGuide: ((LiveGuideTarget, String) -> Void)?
-    private var returning: LiveListReturn?
-    /// The channel to focus once its row is on screen, back from the guide.
-    private var restoreChannelId: String?
-    /// Made to come back from the guide, which took focus away with it.
-    private var claimsFocusOnAppear = false
+    private var appliedReturnId: UUID?
+    /// Back from the guide: where focus goes when the guide's cell leaves.
+    private weak var returnFocusTarget: UIView?
     private var list = LiveCategoryList.build(LiveCategoryList.Input(channels: []))
     private var selectedId: String?
     /// Folded sections per sidebar entry, kept for the session: the list is
@@ -91,9 +92,8 @@ final class LiveListViewController: UIViewController {
 
     private static let timeFormat = Date.FormatStyle.dateTime.hour().minute()
 
-    init(sourceIdFilter: String?, returning: LiveListReturn? = nil) {
+    init(sourceIdFilter: String?) {
         self.sourceIdFilter = sourceIdFilter
-        self.returning = returning
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -151,15 +151,6 @@ final class LiveListViewController: UIViewController {
         super.viewDidAppear(animated)
         // Again on each appear: handlers are asked newest first.
         MenuPressInterceptor.register(self)
-        // Back from the guide, nothing holds focus: the guide's focused cell
-        // went with it. Ask the focus system directly for the channel's row.
-        // Only then: on a tab switch focus is in the sidebar, and stays there.
-        if claimsFocusOnAppear, let system = UIFocusSystem.focusSystem(for: view),
-           (system.focusedItem as? UIView)?.isDescendant(of: view) != true, presentedViewController == nil {
-            claimsFocusOnAppear = false
-            let target = preferredFocusEnvironments.first ?? categoryView
-            system.requestFocusUpdate(to: target)
-        }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -169,22 +160,48 @@ final class LiveListViewController: UIViewController {
         minuteTimer = nil
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // Back from the guide: bring the channel's row on screen, so it can be preferred.
-        if let id = restoreChannelId, let indexPath = channelData.indexPath(for: id),
-           channelView.cellForItem(at: indexPath) == nil {
-            channelView.scrollToItem(at: indexPath, at: .centeredVertically, animated: false)
-        }
-    }
-
     override var preferredFocusEnvironments: [UIFocusEnvironment] {
         if let pendingFocus { return [pendingFocus] }
-        if let id = restoreChannelId, let indexPath = channelData.indexPath(for: id),
-           let cell = channelView.cellForItem(at: indexPath) {
-            return [cell]
-        }
+        if let returnFocusTarget { return [returnFocusTarget] }
         return [categoryView]
+    }
+
+    // MARK: - Guide
+
+    /// The guide is up: hidden, so nothing here can be focused under it.
+    func hideForGuide() {
+        view.isHidden = true
+    }
+
+    /// Back from the guide, on its tab and the channel focused there. The
+    /// guide's focused cell is going away, so the row asks the focus system
+    /// itself; were nothing here focusable, focus would fall to the shell's
+    /// edge and open the sidebar.
+    func returnFromGuide(_ back: LiveListReturn?) {
+        view.isHidden = false
+        guard let back, back.id != appliedReturnId else { return }
+        appliedReturnId = back.id
+        if let id = list.categoryId(for: back.target) {
+            selectCategory(id)
+            categoryView.preferredFocusIndexPath = categoryData.indexPath(for: id)
+        }
+        view.layoutIfNeeded()
+        var target: UIView? = selectedCategoryIndexPath().flatMap { categoryView.cellForItem(at: $0) }
+        if let channelId = back.channelId, let indexPath = channelData.indexPath(for: channelId) {
+            channelView.scrollToItem(at: indexPath, at: .centeredVertically, animated: false)
+            channelView.layoutIfNeeded()
+            if let cell = channelView.cellForItem(at: indexPath) { target = cell }
+        }
+        // Preferred while the guide leaves, which re-resolves focus from the
+        // shell down; asked for again once it has gone, as the guide covers
+        // this row until then and a covered view cannot take focus.
+        returnFocusTarget = target
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let target = self.returnFocusTarget,
+                  let system = UIFocusSystem.focusSystem(for: self.view),
+                  (system.focusedItem as? UIView) !== target else { return }
+            system.requestFocusUpdate(to: target)
+        }
     }
 
     // Right on a channel opens the guide: the press here, the swipe through
@@ -217,8 +234,7 @@ final class LiveListViewController: UIViewController {
     override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
         super.didUpdateFocus(in: context, with: coordinator)
         guard let next = context.nextFocusedView else { return }
-        // The return target applies to the first landing only.
-        if next.isDescendant(of: view) { restoreChannelId = nil }
+        if next === returnFocusTarget { returnFocusTarget = nil }
         if next.isDescendant(of: channelView), context.previouslyFocusedView?.isDescendant(of: channelView) != true {
             channelEntryGesture = MenuPressInterceptor.remoteGestures.count
         }
@@ -369,14 +385,6 @@ final class LiveListViewController: UIViewController {
         snapshot.reconfigureItems(ids.filter(existing.contains))
         categoryData.apply(snapshot, animatingDifferences: false)
 
-        // Back from the guide: its tab, and the channel focused there.
-        if let returning {
-            self.returning = nil
-            claimsFocusOnAppear = true
-            if let id = list.categoryId(for: returning.target) { selectedId = id }
-            restoreChannelId = returning.channelId
-            categoryView.preferredFocusIndexPath = selectedId.flatMap { categoryData.indexPath(for: $0) }
-        }
         if selectedId.flatMap({ list.category($0) }) == nil {
             selectedId = list.categories.first { $0.kind != .sourceHeader }?.id
             categoryView.preferredFocusIndexPath = selectedId.flatMap { categoryData.indexPath(for: $0) }

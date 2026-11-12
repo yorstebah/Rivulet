@@ -89,7 +89,8 @@ private struct LiveBrowseBridge: UIViewControllerRepresentable {
 /// The List layout and the guide it opens: Right on a channel shows the
 /// existing guide on that category, limited to the category's source; Left
 /// from a row's first programme or Menu brings the list back on the guide's
-/// tab and channel.
+/// tab and channel. The list stays underneath, hidden, rather than being
+/// rebuilt, so its row is there to take focus on the way back.
 private struct LiveListHost: View {
     let sourceIdFilter: String?
 
@@ -102,22 +103,25 @@ private struct LiveListHost: View {
     @State private var returning: LiveListReturn?
 
     var body: some View {
-        if let guide {
-            GuideLayoutView(
-                sourceIdFilter: guide.target.sourceId,
-                initialGroup: Self.tabTitle(guide.target.tab),
-                initialChannelId: guide.channelId,
-                onExit: { group, channelId in
-                    returning = LiveListReturn(target: LiveGuideTarget(sourceId: guide.target.sourceId,
-                                                                       tab: Self.tab(group)),
-                                               channelId: channelId ?? guide.channelId)
-                    self.guide = nil
-                })
-        } else {
-            LiveListBridge(sourceIdFilter: sourceIdFilter, returning: returning) { target, channelId in
+        ZStack {
+            LiveListBridge(sourceIdFilter: sourceIdFilter, guideOpen: guide != nil, returning: returning) {
+                target, channelId in
                 guide = OpenGuide(target: target, channelId: channelId)
             }
             .ignoresSafeArea()
+
+            if let guide {
+                GuideLayoutView(
+                    sourceIdFilter: guide.target.sourceId,
+                    initialGroup: Self.tabTitle(guide.target.tab),
+                    initialChannelId: guide.channelId,
+                    onExit: { group, channelId in
+                        returning = LiveListReturn(target: LiveGuideTarget(sourceId: guide.target.sourceId,
+                                                                           tab: Self.tab(group)),
+                                                   channelId: channelId ?? guide.channelId)
+                        self.guide = nil
+                    })
+            }
         }
     }
 
@@ -136,21 +140,26 @@ private struct LiveListHost: View {
     }
 }
 
-/// Hosts the UIKit List layout. Made anew each time the list comes back from
-/// the guide, with where to come back to.
+/// Hosts the UIKit List layout, hidden while the guide is over it.
 private struct LiveListBridge: UIViewControllerRepresentable {
     let sourceIdFilter: String?
+    let guideOpen: Bool
     let returning: LiveListReturn?
     let onOpenGuide: (LiveGuideTarget, String) -> Void
 
     func makeUIViewController(context: Context) -> LiveListViewController {
-        let list = LiveListViewController(sourceIdFilter: sourceIdFilter, returning: returning)
+        let list = LiveListViewController(sourceIdFilter: sourceIdFilter)
         list.onOpenGuide = onOpenGuide
         return list
     }
 
-    func updateUIViewController(_ uiViewController: LiveListViewController, context: Context) {
-        uiViewController.onOpenGuide = onOpenGuide
+    func updateUIViewController(_ list: LiveListViewController, context: Context) {
+        list.onOpenGuide = onOpenGuide
+        if guideOpen {
+            list.hideForGuide()
+        } else if list.view.isHidden {
+            list.returnFromGuide(returning)
+        }
     }
 }
 
