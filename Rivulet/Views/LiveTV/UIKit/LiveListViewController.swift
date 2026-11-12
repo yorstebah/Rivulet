@@ -83,6 +83,9 @@ final class LiveListViewController: UIViewController {
     private var cancellables = Set<AnyCancellable>()
     private var minuteTimer: Timer?
     private var guideSwipe: DirectionalInputBinding?
+    /// The remote gesture that brought focus into the channels. That same
+    /// Right goes on to reach `pressesBegan`, and must not open the guide.
+    private var channelEntryGesture = -1
 
     private static let timeFormat = Date.FormatStyle.dateTime.hour().minute()
 
@@ -194,8 +197,10 @@ final class LiveListViewController: UIViewController {
         return focused.isDescendant(of: channelView)
     }
 
+    /// Only a fresh Right once focus is on a channel; the one that moved it there is spent.
     private func openGuide() {
-        guard let onOpenGuide, let categoryId = selectedId, let channelId = focusedChannelId(),
+        guard MenuPressInterceptor.remoteGestures.count != channelEntryGesture,
+              let onOpenGuide, let categoryId = selectedId, let channelId = focusedChannelId(),
               let target = list.guideTarget(for: categoryId) else { return }
         onOpenGuide(target, channelId)
     }
@@ -207,6 +212,9 @@ final class LiveListViewController: UIViewController {
         guard let next = context.nextFocusedView else { return }
         // The return target applies to the first landing only.
         if next.isDescendant(of: view) { restoreChannelId = nil }
+        if next.isDescendant(of: channelView), context.previouslyFocusedView?.isDescendant(of: channelView) != true {
+            channelEntryGesture = MenuPressInterceptor.remoteGestures.count
+        }
         if next.isDescendant(of: channelView) {
             columnGuide.preferredFocusEnvironments = [categoryView]
             categoryView.preferredFocusIndexPath = selectedCategoryIndexPath()
