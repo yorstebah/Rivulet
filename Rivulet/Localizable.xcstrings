@@ -865,6 +865,28 @@
         }
       }
     },
+    "%lld channels" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld channel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld channels"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld collections" : {
       "localizations" : {
         "de" : {
@@ -11035,6 +11057,7 @@
         }
       }
     },
+    "List" : {},
     "Live" : {
       "localizations" : {
         "de" : {
@@ -14555,6 +14578,7 @@
         }
       }
     },
+    "The Guide lists every channel against the time. What's On shows rows of what is on now, with multiview, like the Apple TV app. List shows your categories beside their channels and what is on each." : {},
     "Your Plex server's tuners. Select to see details or remove it." : {
       "localizations" : {
         "de" : {
