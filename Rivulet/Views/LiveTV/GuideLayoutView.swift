@@ -19,11 +19,24 @@ import UIKit
 struct GuideLayoutView: View {
     /// Optional source ID to filter channels. nil = show all sources.
     var sourceIdFilter: String?
+    /// Opened from the List layout: the channel to focus first, and where
+    /// Left from a row's first programme or Menu goes, with the tab and
+    /// channel to come back on. nil for the Guide layout itself.
+    var initialChannelId: String?
+    var onExit: ((_ group: String?, _ channelId: String?) -> Void)?
 
     @StateObject private var dataStore = LiveTVDataStore.shared
 
     /// Selected category tab. nil = "All Channels"; otherwise an M3U group title.
     @State private var selectedGroup: String?
+
+    init(sourceIdFilter: String? = nil, initialGroup: String? = nil, initialChannelId: String? = nil,
+         onExit: ((_ group: String?, _ channelId: String?) -> Void)? = nil) {
+        self.sourceIdFilter = sourceIdFilter
+        self.initialChannelId = initialChannelId
+        self.onExit = onExit
+        _selectedGroup = State(initialValue: initialGroup)
+    }
 
     /// Channels for the current source, before category filtering.
     private var sourceChannels: [UnifiedChannel] {
@@ -216,6 +229,12 @@ struct GuideLayoutView: View {
             if dataStore.epg.isEmpty {
                 await dataStore.loadEPG(startDate: timelineStart, hours: EPGTheme.initialGuideHours)
             }
+            // Opened from the List: on the channel that was focused there.
+            if let id = initialChannelId, let channel = channels.first(where: { $0.id == id }) {
+                focusedChannel = channel
+                focusedProgram = dataStore.getCurrentProgram(for: channel)
+                gridFocusRequest = EPGFocusRequest(channelId: id, token: UUID())
+            }
             seedFocus()
             await dataStore.refreshScheduledRecordings()
         }
@@ -288,7 +307,8 @@ struct GuideLayoutView: View {
                 categoryActionTitle: dataStore.hasRecordingSources ? String(localized: "Recordings") : nil,
                 onCategoryAction: { presentRecordings() },
                 miniSession: miniSession,
-                onMiniPlayerSelect: { miniSession.map { selectChannel($0.channel) } }
+                onMiniPlayerSelect: { miniSession.map { selectChannel($0.channel) } },
+                onExit: onExit.map { exit in { exit(selectedGroup, focusedChannel?.id) } }
             )
         }
     }

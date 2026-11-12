@@ -109,6 +109,9 @@ struct EPGGuide: UIViewRepresentable {
     /// The channel still playing in the corner, and what Select on it does.
     var miniSession: LiveTVSessionHandoff? = nil
     var onMiniPlayerSelect: (() -> Void)? = nil
+    /// Set when the guide was opened from the List layout: Left from a row's
+    /// first programme, and Menu, leave the guide through it.
+    var onExit: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -172,11 +175,13 @@ struct EPGGuide: UIViewRepresentable {
             actionTitle: categoryActionTitle,
             onAction: onCategoryAction)
         container.setTransparent(transparent)
+        container.onExit = onExit
         return container
     }
 
     func updateUIView(_ uiView: EPGContainerView, context: Context) {
         context.coordinator.parent = self
+        uiView.onExit = onExit
         guard let cv = context.coordinator.collectionView,
               let layout = cv.collectionViewLayout as? EPGLayout else { return }
         uiView.configureCategories(
@@ -410,6 +415,8 @@ struct EPGGuide: UIViewRepresentable {
             // A plain no-op. Only `.left` headings reach here, so Up, Down and
             // Right at this same cell are untouched, and Menu is not a focus
             // heading at all and still escapes to the sidebar as usual.
+            // Opened from the List, this Left goes back to it instead.
+            if let onExit = parent.onExit { DispatchQueue.main.async(execute: onExit) }
             return false
         }
 
@@ -667,6 +674,8 @@ final class EPGContainerView: UIView {
     private let timeFade = CAGradientLayer()
     private let bottomFade = CAGradientLayer()
     private let rightFade = CAGradientLayer()
+    /// Opened from the List layout: Menu leaves the guide through this.
+    var onExit: (() -> Void)?
     /// The grid starts this far below the top, so the info bar above it can never
     /// obscure a focused cell.
     var contentTopInset: CGFloat = 0 { didSet { setNeedsLayout() } }
@@ -930,8 +939,13 @@ extension EPGContainerView: MenuBackHandling, SidebarTabReselecting {
         // focus in its own views, and Menu keeps its meaning there.
         guard let system = UIFocusSystem.focusSystem(for: self),
               let focused = system.focusedItem as? UIView,
-              focused.isDescendant(of: self), !focused.isDescendant(of: miniPlayer)
-        else { return false }
+              focused.isDescendant(of: self) else { return false }
+        // Opened from the List: one press goes back to it, from anywhere here.
+        if let onExit {
+            onExit()
+            return true
+        }
+        guard !focused.isDescendant(of: miniPlayer) else { return false }
         // Requested from this view, which holds focus: a request aimed at the
         // corner player is ignored, since it doesn't (#334). Before the scroll,
         // which can take the focused cell away.
