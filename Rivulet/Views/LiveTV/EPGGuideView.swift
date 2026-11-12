@@ -608,7 +608,16 @@ struct EPGGuide: UIViewRepresentable {
         /// Scroll `channelId`'s row into view at the live edge of the timeline
         /// and put focus on its programme airing now. Used when the player
         /// closes, so the guide comes back on the channel that was playing.
-        func focusLiveProgramme(channelId: String) {
+        func focusLiveProgramme(channelId: String, attempt: Int = 0) {
+            // Requested as the guide appears (opened from the List): wait for
+            // its first layout, or there is no cell to focus yet.
+            if let cv = collectionView, cv.window == nil || cv.bounds.isEmpty || sections.isEmpty {
+                guard attempt < 20 else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    self?.focusLiveProgramme(channelId: channelId, attempt: attempt + 1)
+                }
+                return
+            }
             guard let cv = collectionView,
                   let layout = cv.collectionViewLayout as? EPGLayout,
                   let section = sections.firstIndex(where: { $0.id == channelId }),
@@ -814,6 +823,15 @@ final class EPGContainerView: UIView {
             guard let self, let cv, self.pendingGridFocusTarget == nil else { return }
             cv.layoutIfNeeded()
             guard let cell = cv.cellForItem(at: indexPath) else { return }
+            // Nothing here holds focus yet: the guide has just replaced the
+            // List, whose focused row went with it. A request from this view
+            // would be ignored, so it goes to the focus system itself.
+            if let system = UIFocusSystem.focusSystem(for: self),
+               (system.focusedItem as? UIView)?.isDescendant(of: self) != true,
+               self.window?.rootViewController?.presentedViewController == nil {
+                system.requestFocusUpdate(to: cell)
+                return
+            }
             self.pendingGridFocusTarget = cell
             self.setNeedsFocusUpdate()
             self.updateFocusIfNeeded()

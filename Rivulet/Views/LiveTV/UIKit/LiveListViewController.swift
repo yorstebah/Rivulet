@@ -46,6 +46,8 @@ final class LiveListViewController: UIViewController {
     private var returning: LiveListReturn?
     /// The channel to focus once its row is on screen, back from the guide.
     private var restoreChannelId: String?
+    /// Made to come back from the guide, which took focus away with it.
+    private var claimsFocusOnAppear = false
     private var list = LiveCategoryList.build(LiveCategoryList.Input(channels: []))
     private var selectedId: String?
     /// Folded sections per sidebar entry, kept for the session: the list is
@@ -149,9 +151,14 @@ final class LiveListViewController: UIViewController {
         super.viewDidAppear(animated)
         // Again on each appear: handlers are asked newest first.
         MenuPressInterceptor.register(self)
-        if restoreChannelId != nil {
-            setNeedsFocusUpdate()
-            updateFocusIfNeeded()
+        // Back from the guide, nothing holds focus: the guide's focused cell
+        // went with it. Ask the focus system directly for the channel's row.
+        // Only then: on a tab switch focus is in the sidebar, and stays there.
+        if claimsFocusOnAppear, let system = UIFocusSystem.focusSystem(for: view),
+           (system.focusedItem as? UIView)?.isDescendant(of: view) != true, presentedViewController == nil {
+            claimsFocusOnAppear = false
+            let target = preferredFocusEnvironments.first ?? categoryView
+            system.requestFocusUpdate(to: target)
         }
     }
 
@@ -365,6 +372,7 @@ final class LiveListViewController: UIViewController {
         // Back from the guide: its tab, and the channel focused there.
         if let returning {
             self.returning = nil
+            claimsFocusOnAppear = true
             if let id = list.categoryId(for: returning.target) { selectedId = id }
             restoreChannelId = returning.channelId
             categoryView.preferredFocusIndexPath = selectedId.flatMap { categoryData.indexPath(for: $0) }
