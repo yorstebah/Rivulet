@@ -9,10 +9,19 @@
 //  one's channels on the right with what each airs now. Selection follows
 //  focus, as in the guide's category pills. Plays and opens the programme menu
 //  as What's On does; there is no corner player here, so Back ends a channel.
+//  Right on a channel opens the guide for its category (`onOpenGuide`); the
+//  host brings the list back on the guide's tab and channel (`LiveListReturn`).
 //
 
 import UIKit
 import Combine
+
+/// Where the list comes back to from the guide: the guide's tab, and the
+/// channel focused there.
+struct LiveListReturn {
+    let target: LiveGuideTarget
+    let channelId: String?
+}
 
 final class LiveListViewController: UIViewController {
 
@@ -32,9 +41,20 @@ final class LiveListViewController: UIViewController {
     }
 
     private let sourceIdFilter: String?
+    /// Right on a channel: the guide for the selected category, on that channel.
+    var onOpenGuide: ((LiveGuideTarget, String) -> Void)?
+    private var returning: LiveListReturn?
+    /// The channel to focus once its row is on screen, back from the guide.
+    private var restoreChannelId: String?
     private var list = LiveCategoryList.build(LiveCategoryList.Input(channels: []))
     private var selectedId: String?
-    private var collapsedSourceIds: Set<String> = []
+    /// Folded sections per sidebar entry, kept for the session: the list is
+    /// rebuilt each time it comes back from the guide.
+    private static var collapsedBySource: [String: Set<String>] = [:]
+    private var collapsedSourceIds: Set<String> {
+        get { Self.collapsedBySource[sourceIdFilter ?? ""] ?? [] }
+        set { Self.collapsedBySource[sourceIdFilter ?? ""] = newValue }
+    }
     /// The channels on the right, and the category they belong to.
     private var shownCategoryId: String?
     private var shownIds: [String] = []
@@ -62,11 +82,13 @@ final class LiveListViewController: UIViewController {
     private var pendingFocus: UIFocusEnvironment?
     private var cancellables = Set<AnyCancellable>()
     private var minuteTimer: Timer?
+    private var guideSwipe: DirectionalInputBinding?
 
     private static let timeFormat = Date.FormatStyle.dateTime.hour().minute()
 
-    init(sourceIdFilter: String?) {
+    init(sourceIdFilter: String?, returning: LiveListReturn? = nil) {
         self.sourceIdFilter = sourceIdFilter
+        self.returning = returning
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -124,6 +146,10 @@ final class LiveListViewController: UIViewController {
         super.viewDidAppear(animated)
         // Again on each appear: handlers are asked newest first.
         MenuPressInterceptor.register(self)
+        if restoreChannelId != nil {
+            setNeedsFocusUpdate()
+            updateFocusIfNeeded()
+        }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -133,9 +159,45 @@ final class LiveListViewController: UIViewController {
         minuteTimer = nil
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Back from the guide: bring the channel's row on screen, so it can be preferred.
+        if let id = restoreChannelId, let indexPath = channelData.indexPath(for: id),
+           channelView.cellForItem(at: indexPath) == nil {
+            channelView.scrollToItem(at: indexPath, at: .centeredVertically, animated: false)
+        }
+    }
+
     override var preferredFocusEnvironments: [UIFocusEnvironment] {
         if let pendingFocus { return [pendingFocus] }
+        if let id = restoreChannelId, let indexPath = channelData.indexPath(for: id),
+           let cell = channelView.cellForItem(at: indexPath) {
+            return [cell]
+        }
         return [categoryView]
+    }
+
+    // Right on a channel opens the guide: the press here, the swipe through
+    // `guideSwipe`. Nothing lies to the right of a row, so the engine never
+    // takes this move itself.
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        guard presentedViewController == nil,
+              presses.contains(where: { $0.type == .rightArrow }), focusIsOnChannel() else {
+            super.pressesBegan(presses, with: event)
+            return
+        }
+        openGuide()
+    }
+
+    private func focusIsOnChannel() -> Bool {
+        guard let focused = UIFocusSystem.focusSystem(for: view)?.focusedItem as? UIView else { return false }
+        return focused.isDescendant(of: channelView)
+    }
+
+    private func openGuide() {
+        guard let onOpenGuide, let categoryId = selectedId, let channelId = focusedChannelId(),
+              let target = list.guideTarget(for: categoryId) else { return }
+        onOpenGuide(target, channelId)
     }
 
     // Left from the channels: the guide between the columns now leads to the
@@ -143,6 +205,8 @@ final class LiveListViewController: UIViewController {
     override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
         super.didUpdateFocus(in: context, with: coordinator)
         guard let next = context.nextFocusedView else { return }
+        // The return target applies to the first landing only.
+        if next.isDescendant(of: view) { restoreChannelId = nil }
         if next.isDescendant(of: channelView) {
             columnGuide.preferredFocusEnvironments = [categoryView]
             categoryView.preferredFocusIndexPath = selectedCategoryIndexPath()
@@ -222,6 +286,14 @@ final class LiveListViewController: UIViewController {
         }
 
         channelView.addGestureRecognizer(TileLongPress.makeRecognizer(target: self, action: #selector(handleLongPress(_:))))
+        guideSwipe = DirectionalInputBinding(
+            gatedSwipesOn: channelView,
+            directions: [.right],
+            shouldHandle: { [weak self] _ in
+                guard let self else { return false }
+                return self.presentedViewController == nil && self.focusIsOnChannel()
+            },
+            onSwipe: { [weak self] _ in self?.openGuide() })
 
         view.addLayoutGuide(columnGuide)
         let outset = LiveChannelRowCell.platterOutset
@@ -282,6 +354,13 @@ final class LiveListViewController: UIViewController {
         snapshot.reconfigureItems(ids.filter(existing.contains))
         categoryData.apply(snapshot, animatingDifferences: false)
 
+        // Back from the guide: its tab, and the channel focused there.
+        if let returning {
+            self.returning = nil
+            if let id = list.categoryId(for: returning.target) { selectedId = id }
+            restoreChannelId = returning.channelId
+            categoryView.preferredFocusIndexPath = selectedId.flatMap { categoryData.indexPath(for: $0) }
+        }
         if selectedId.flatMap({ list.category($0) }) == nil {
             selectedId = list.categories.first { $0.kind != .sourceHeader }?.id
             categoryView.preferredFocusIndexPath = selectedId.flatMap { categoryData.indexPath(for: $0) }

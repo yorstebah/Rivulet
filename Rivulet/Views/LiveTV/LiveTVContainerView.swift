@@ -57,8 +57,7 @@ struct LiveTVContainerView: View {
                     .ignoresSafeArea()
                     .id(sourceIdFilter ?? "all")
             case .list:
-                LiveListBridge(sourceIdFilter: sourceIdFilter)
-                    .ignoresSafeArea()
+                LiveListHost(sourceIdFilter: sourceIdFilter)
                     .id(sourceIdFilter ?? "all")
             }
         }
@@ -87,15 +86,72 @@ private struct LiveBrowseBridge: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: LiveBrowseViewController, context: Context) {}
 }
 
-/// Hosts the UIKit List layout, rebuilt per source like `LiveBrowseBridge`.
-private struct LiveListBridge: UIViewControllerRepresentable {
+/// The List layout and the guide it opens: Right on a channel shows the
+/// existing guide on that category, limited to the category's source; Left
+/// from a row's first programme or Menu brings the list back on the guide's
+/// tab and channel.
+private struct LiveListHost: View {
     let sourceIdFilter: String?
 
-    func makeUIViewController(context: Context) -> LiveListViewController {
-        LiveListViewController(sourceIdFilter: sourceIdFilter)
+    private struct OpenGuide {
+        let target: LiveGuideTarget
+        let channelId: String
     }
 
-    func updateUIViewController(_ uiViewController: LiveListViewController, context: Context) {}
+    @State private var guide: OpenGuide?
+    @State private var returning: LiveListReturn?
+
+    var body: some View {
+        if let guide {
+            GuideLayoutView(
+                sourceIdFilter: guide.target.sourceId,
+                initialGroup: Self.tabTitle(guide.target.tab),
+                initialChannelId: guide.channelId,
+                onExit: { group, channelId in
+                    returning = LiveListReturn(target: LiveGuideTarget(sourceId: guide.target.sourceId,
+                                                                       tab: Self.tab(group)),
+                                               channelId: channelId ?? guide.channelId)
+                    self.guide = nil
+                })
+        } else {
+            LiveListBridge(sourceIdFilter: sourceIdFilter, returning: returning) { target, channelId in
+                guide = OpenGuide(target: target, channelId: channelId)
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    /// The guide's tab title for a target: nil is All Channels.
+    static func tabTitle(_ tab: LiveGuideTarget.Tab) -> String? {
+        switch tab {
+        case .all: return nil
+        case .favorites: return GuideLayoutView.favouritesTab
+        case .group(let title): return title
+        }
+    }
+
+    static func tab(_ title: String?) -> LiveGuideTarget.Tab {
+        guard let title else { return .all }
+        return title == GuideLayoutView.favouritesTab ? .favorites : .group(title)
+    }
+}
+
+/// Hosts the UIKit List layout. Made anew each time the list comes back from
+/// the guide, with where to come back to.
+private struct LiveListBridge: UIViewControllerRepresentable {
+    let sourceIdFilter: String?
+    let returning: LiveListReturn?
+    let onOpenGuide: (LiveGuideTarget, String) -> Void
+
+    func makeUIViewController(context: Context) -> LiveListViewController {
+        let list = LiveListViewController(sourceIdFilter: sourceIdFilter, returning: returning)
+        list.onOpenGuide = onOpenGuide
+        return list
+    }
+
+    func updateUIViewController(_ uiViewController: LiveListViewController, context: Context) {
+        uiViewController.onOpenGuide = onOpenGuide
+    }
 }
 
 #Preview {
