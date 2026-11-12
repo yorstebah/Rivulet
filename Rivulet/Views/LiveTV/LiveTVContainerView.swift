@@ -57,7 +57,8 @@ struct LiveTVContainerView: View {
                     .ignoresSafeArea()
                     .id(sourceIdFilter ?? "all")
             case .list:
-                LiveListHost(sourceIdFilter: sourceIdFilter)
+                LiveListBridge(sourceIdFilter: sourceIdFilter)
+                    .ignoresSafeArea()
                     .id(sourceIdFilter ?? "all")
             }
         }
@@ -86,44 +87,28 @@ private struct LiveBrowseBridge: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: LiveBrowseViewController, context: Context) {}
 }
 
-/// The List layout and the guide it opens: Right on a channel shows the
-/// existing guide on that category, limited to the category's source; Left
-/// from a row's first programme or Menu brings the list back on the guide's
-/// tab and channel. The list stays underneath, hidden, rather than being
-/// rebuilt, so its row is there to take focus on the way back.
-private struct LiveListHost: View {
+/// Hosts the UIKit List layout, and builds the guide it lays over itself:
+/// the existing guide on the category's tab, limited to its source, focused
+/// on the channel. Left from a row's first programme or Menu takes it off.
+private struct LiveListBridge: UIViewControllerRepresentable {
     let sourceIdFilter: String?
 
-    private struct OpenGuide {
-        let target: LiveGuideTarget
-        let channelId: String
-    }
-
-    @State private var guide: OpenGuide?
-    @State private var returning: LiveListReturn?
-
-    var body: some View {
-        ZStack {
-            LiveListBridge(sourceIdFilter: sourceIdFilter, guideOpen: guide != nil, returning: returning) {
-                target, channelId in
-                guide = OpenGuide(target: target, channelId: channelId)
-            }
-            .ignoresSafeArea()
-
-            if let guide {
-                GuideLayoutView(
-                    sourceIdFilter: guide.target.sourceId,
-                    initialGroup: Self.tabTitle(guide.target.tab),
-                    initialChannelId: guide.channelId,
-                    onExit: { group, channelId in
-                        returning = LiveListReturn(target: LiveGuideTarget(sourceId: guide.target.sourceId,
-                                                                           tab: Self.tab(group)),
-                                                   channelId: channelId ?? guide.channelId)
-                        self.guide = nil
-                    })
-            }
+    func makeUIViewController(context: Context) -> LiveListViewController {
+        let list = LiveListViewController(sourceIdFilter: sourceIdFilter)
+        list.makeGuide = { target, channelId, close in
+            UIHostingController(rootView: GuideLayoutView(
+                sourceIdFilter: target.sourceId,
+                initialGroup: Self.tabTitle(target.tab),
+                initialChannelId: channelId,
+                onExit: { group, focusedId in
+                    close(LiveListReturn(target: LiveGuideTarget(sourceId: target.sourceId, tab: Self.tab(group)),
+                                         channelId: focusedId ?? channelId))
+                }))
         }
+        return list
     }
+
+    func updateUIViewController(_ list: LiveListViewController, context: Context) {}
 
     /// The guide's tab title for a target: nil is All Channels.
     static func tabTitle(_ tab: LiveGuideTarget.Tab) -> String? {
@@ -137,29 +122,6 @@ private struct LiveListHost: View {
     static func tab(_ title: String?) -> LiveGuideTarget.Tab {
         guard let title else { return .all }
         return title == GuideLayoutView.favouritesTab ? .favorites : .group(title)
-    }
-}
-
-/// Hosts the UIKit List layout, hidden while the guide is over it.
-private struct LiveListBridge: UIViewControllerRepresentable {
-    let sourceIdFilter: String?
-    let guideOpen: Bool
-    let returning: LiveListReturn?
-    let onOpenGuide: (LiveGuideTarget, String) -> Void
-
-    func makeUIViewController(context: Context) -> LiveListViewController {
-        let list = LiveListViewController(sourceIdFilter: sourceIdFilter)
-        list.onOpenGuide = onOpenGuide
-        return list
-    }
-
-    func updateUIViewController(_ list: LiveListViewController, context: Context) {
-        list.onOpenGuide = onOpenGuide
-        if guideOpen {
-            list.hideForGuide()
-        } else if list.view.isHidden {
-            list.returnFromGuide(returning)
-        }
     }
 }
 

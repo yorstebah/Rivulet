@@ -9,9 +9,9 @@
 //  one's channels on the right with what each airs now. Selection follows
 //  focus, as in the guide's category pills. Plays and opens the programme menu
 //  as What's On does; there is no corner player here, so Back ends a channel.
-//  Right on a channel opens the guide for its category (`onOpenGuide`). The
-//  list stays in place, hidden, while the guide is up, so on the way back its
-//  row is there to take focus (`returnFromGuide`).
+//  Right on a channel opens the guide for its category: the host builds it
+//  (`makeGuide`), and the list lays it over itself as a child and takes it off
+//  again, so on the way back its row is there to take focus at once.
 //
 
 import UIKit
@@ -19,11 +19,9 @@ import Combine
 
 /// Where the list comes back to from the guide: the guide's tab, and the
 /// channel focused there.
-struct LiveListReturn: Equatable {
+struct LiveListReturn {
     let target: LiveGuideTarget
     let channelId: String?
-    /// Each return is applied once.
-    let id = UUID()
 }
 
 final class LiveListViewController: UIViewController {
@@ -44,11 +42,12 @@ final class LiveListViewController: UIViewController {
     }
 
     private let sourceIdFilter: String?
-    /// Right on a channel: the guide for the selected category, on that channel.
-    var onOpenGuide: ((LiveGuideTarget, String) -> Void)?
-    private var appliedReturnId: UUID?
-    /// Back from the guide: where focus goes when the guide's cell leaves.
-    private weak var returnFocusTarget: UIView?
+    /// Builds the guide for a category, on a channel. Its argument is how the
+    /// guide leaves: with the tab and channel to come back on.
+    var makeGuide: ((LiveGuideTarget, String, @escaping (LiveListReturn) -> Void) -> UIViewController)?
+    private var guide: UIViewController?
+    /// Back from the guide: the channel whose row is preferred until focus lands.
+    private var returnChannelId: String?
     private var list = LiveCategoryList.build(LiveCategoryList.Input(channels: []))
     private var selectedId: String?
     /// Folded sections per sidebar entry, kept for the session: the list is
@@ -162,46 +161,84 @@ final class LiveListViewController: UIViewController {
 
     override var preferredFocusEnvironments: [UIFocusEnvironment] {
         if let pendingFocus { return [pendingFocus] }
-        if let returnFocusTarget { return [returnFocusTarget] }
+        if let guide { return [guide] }
+        if let row = returnFocusTarget() { return [row] }
         return [categoryView]
     }
 
     // MARK: - Guide
 
-    /// The guide is up: hidden, so nothing here can be focused under it.
-    func hideForGuide() {
-        view.isHidden = true
+    /// The guide over the list, on the focused channel. It covers the
+    /// focused row, which then cannot keep focus, so the guide is laid out at
+    /// once and given focus before the engine looks elsewhere (the shell's
+    /// edge, which opens the sidebar). Inside, the channel's programme takes it.
+    private func showGuide(_ target: LiveGuideTarget, channelId: String) {
+        guard guide == nil, let makeGuide else { return }
+        let guide = makeGuide(target, channelId) { [weak self] back in self?.closeGuide(back) }
+        self.guide = guide
+        // Opaque, so the list never shows through where the guide draws nothing.
+        guide.view.backgroundColor = .black
+        guide.view.frame = view.bounds
+        guide.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addChild(guide)
+        view.addSubview(guide.view)
+        guide.didMove(toParent: self)
+        guide.view.layoutIfNeeded()
+        // Covered is not enough: a covered row keeps focus. Hidden, it cannot.
+        setColumnsHidden(true)
+        // After the press that opened it has been handled; during it the
+        // request is dropped.
+        DispatchQueue.main.async { [weak self, weak guide] in
+            guard let self, let guide, self.guide === guide else { return }
+            let target: UIView = Self.guideContainer(in: guide.view) ?? guide.view
+            UIFocusSystem.focusSystem(for: self.view)?.requestFocusUpdate(to: target)
+        }
     }
 
-    /// Back from the guide, on its tab and the channel focused there. The
-    /// guide's focused cell is going away, so the row asks the focus system
-    /// itself; were nothing here focusable, focus would fall to the shell's
-    /// edge and open the sidebar.
-    func returnFromGuide(_ back: LiveListReturn?) {
-        view.isHidden = false
-        guard let back, back.id != appliedReturnId else { return }
-        appliedReturnId = back.id
+    private func setColumnsHidden(_ hidden: Bool) {
+        categoryView.isHidden = hidden
+        channelView.isHidden = hidden
+    }
+
+    /// The guide's UIKit grid inside its hosting view.
+    private static func guideContainer(in view: UIView) -> UIView? {
+        if view is EPGContainerView { return view }
+        for subview in view.subviews {
+            if let found = guideContainer(in: subview) { return found }
+        }
+        return nil
+    }
+
+    /// Back from the guide, on its tab and the channel focused there. The row
+    /// is brought on screen under the guide first, so the moment the guide
+    /// comes off it is there to take focus.
+    private func closeGuide(_ back: LiveListReturn) {
+        guard let guide else { return }
         if let id = list.categoryId(for: back.target) {
             selectCategory(id)
             categoryView.preferredFocusIndexPath = categoryData.indexPath(for: id)
         }
-        view.layoutIfNeeded()
-        var target: UIView? = selectedCategoryIndexPath().flatMap { categoryView.cellForItem(at: $0) }
+        returnChannelId = back.channelId
         if let channelId = back.channelId, let indexPath = channelData.indexPath(for: channelId) {
+            channelView.layoutIfNeeded()
             channelView.scrollToItem(at: indexPath, at: .centeredVertically, animated: false)
             channelView.layoutIfNeeded()
-            if let cell = channelView.cellForItem(at: indexPath) { target = cell }
         }
-        // Preferred while the guide leaves, which re-resolves focus from the
-        // shell down; asked for again once it has gone, as the guide covers
-        // this row until then and a covered view cannot take focus.
-        returnFocusTarget = target
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let target = self.returnFocusTarget,
-                  let system = UIFocusSystem.focusSystem(for: self.view),
-                  (system.focusedItem as? UIView) !== target else { return }
-            system.requestFocusUpdate(to: target)
-        }
+
+        setColumnsHidden(false)
+        guide.willMove(toParent: nil)
+        guide.view.removeFromSuperview()
+        guide.removeFromParent()
+        self.guide = nil
+
+        let target = returnFocusTarget() ?? selectedCategoryIndexPath().flatMap { categoryView.cellForItem(at: $0) }
+        if let target { UIFocusSystem.focusSystem(for: view)?.requestFocusUpdate(to: target) }
+    }
+
+    /// The returning channel's row, while it is on screen.
+    private func returnFocusTarget() -> UIView? {
+        guard let id = returnChannelId, let indexPath = channelData.indexPath(for: id) else { return nil }
+        return channelView.cellForItem(at: indexPath)
     }
 
     // Right on a channel opens the guide: the press here, the swipe through
@@ -224,9 +261,9 @@ final class LiveListViewController: UIViewController {
     /// Only a fresh Right once focus is on a channel; the one that moved it there is spent.
     private func openGuide() {
         guard MenuPressInterceptor.remoteGestures.count != channelEntryGesture,
-              let onOpenGuide, let categoryId = selectedId, let channelId = focusedChannelId(),
+              let categoryId = selectedId, let channelId = focusedChannelId(),
               let target = list.guideTarget(for: categoryId) else { return }
-        onOpenGuide(target, channelId)
+        showGuide(target, channelId: channelId)
     }
 
     // Left from the channels: the guide between the columns now leads to the
@@ -234,7 +271,7 @@ final class LiveListViewController: UIViewController {
     override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
         super.didUpdateFocus(in: context, with: coordinator)
         guard let next = context.nextFocusedView else { return }
-        if next === returnFocusTarget { returnFocusTarget = nil }
+        if next.isDescendant(of: view) { returnChannelId = nil }
         if next.isDescendant(of: channelView), context.previouslyFocusedView?.isDescendant(of: channelView) != true {
             channelEntryGesture = MenuPressInterceptor.remoteGestures.count
         }
@@ -627,6 +664,14 @@ extension LiveListViewController: MenuBackHandling, SidebarTabReselecting {
 
     /// Both columns to the top, and focus on the first category.
     func reselectSidebarTab() {
+        // The guide over the list comes off first.
+        if let guide {
+            setColumnsHidden(false)
+            guide.willMove(toParent: nil)
+            guide.view.removeFromSuperview()
+            guide.removeFromParent()
+            self.guide = nil
+        }
         ScrollToTopTransition.perform(in: categoryView) {
             categoryView.setContentOffset(CGPoint(x: 0, y: -categoryView.adjustedContentInset.top), animated: false)
             if let first = list.categories.first(where: { $0.kind != .sourceHeader }) { selectCategory(first.id) }

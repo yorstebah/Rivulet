@@ -416,7 +416,7 @@ struct EPGGuide: UIViewRepresentable {
             // Right at this same cell are untouched, and Menu is not a focus
             // heading at all and still escapes to the sidebar as usual.
             // Opened from the List, this Left goes back to it instead.
-            if let onExit = parent.onExit { DispatchQueue.main.async(execute: onExit) }
+            if parent.onExit != nil { (collectionView.superview as? EPGContainerView)?.exitToList() }
             return false
         }
 
@@ -635,6 +635,10 @@ struct EPGGuide: UIViewRepresentable {
             lockedX = -EPGTheme.channelColumnWidth
             cv.setContentOffset(CGPoint(x: lockedX, y: targetY), animated: false)
             cv.layoutIfNeeded()
+            if parent.onExit != nil, let container = cv.superview as? EPGContainerView,
+               let cell = cv.cellForItem(at: IndexPath(item: item, section: section)) {
+                container.initialFocusTarget = cell
+            }
             requestFocus(IndexPath(item: item, section: section))
         }
 
@@ -683,8 +687,30 @@ final class EPGContainerView: UIView {
     private let timeFade = CAGradientLayer()
     private let bottomFade = CAGradientLayer()
     private let rightFade = CAGradientLayer()
-    /// Opened from the List layout: Menu leaves the guide through this.
+    /// Opened from the List layout: Left out of the guide and Menu leave
+    /// through this.
     var onExit: (() -> Void)?
+    private var isExiting = false
+
+    /// Leaves for the List once, however many moves ask for it on the way.
+    func exitToList() {
+        guard let onExit, !isExiting else { return }
+        isExiting = true
+        DispatchQueue.main.async(execute: onExit)
+    }
+
+    /// Opened from the List, any Left that would leave the guide (from the
+    /// grid, the pills or the corner player) goes back to it, never to the
+    /// shell's edge and the sidebar.
+    override func shouldUpdateFocus(in context: UIFocusUpdateContext) -> Bool {
+        if onExit != nil, context.focusHeading.contains(.left),
+           (context.previouslyFocusedItem as? UIView)?.isDescendant(of: self) == true,
+           (context.nextFocusedItem as? UIView)?.isDescendant(of: self) != true {
+            exitToList()
+            return false
+        }
+        return super.shouldUpdateFocus(in: context)
+    }
     /// The grid starts this far below the top, so the info bar above it can never
     /// obscure a focused cell.
     var contentTopInset: CGFloat = 0 { didSet { setNeedsLayout() } }
@@ -790,6 +816,19 @@ final class EPGContainerView: UIView {
     /// programme focused before it.
     override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
         super.didUpdateFocus(in: context, with: coordinator)
+        if context.nextFocusedView === initialFocusTarget {
+            initialFocusTarget = nil
+        } else if let target = initialFocusTarget, let next = context.nextFocusedView, next.isDescendant(of: self) {
+            // Focus came in elsewhere (the pills): on to the channel's programme.
+            initialFocusTarget = nil
+            DispatchQueue.main.async { [weak self, weak target] in
+                guard let self, let target, target.window != nil else { return }
+                self.pendingGridFocusTarget = target
+                self.setNeedsFocusUpdate()
+                self.updateFocusIfNeeded()
+                self.pendingGridFocusTarget = nil
+            }
+        }
         if context.nextFocusedView === miniPlayer, let miniChannel {
             onMiniPlayerFocus?(miniChannel)
         }
@@ -847,8 +886,16 @@ final class EPGContainerView: UIView {
         if let pendingCategoryFocusTarget {
             return [pendingCategoryFocusTarget]
         }
+        // Opened from the List: focus enters on the channel's programme, not the pills.
+        if let initialFocusTarget, initialFocusTarget.window != nil {
+            return [initialFocusTarget]
+        }
         return super.preferredFocusEnvironments
     }
+
+    /// The programme focus first enters on, opened from the List. Cleared
+    /// once focus is inside the guide.
+    weak var initialFocusTarget: UIView?
 
     /// Complete the category-to-grid handoff after the directional focus update
     /// that requested it has ended. Calling `updateFocusIfNeeded` inline from a
@@ -959,8 +1006,8 @@ extension EPGContainerView: MenuBackHandling, SidebarTabReselecting {
               let focused = system.focusedItem as? UIView,
               focused.isDescendant(of: self) else { return false }
         // Opened from the List: one press goes back to it, from anywhere here.
-        if let onExit {
-            onExit()
+        if onExit != nil {
+            exitToList()
             return true
         }
         guard !focused.isDescendant(of: miniPlayer) else { return false }
@@ -1077,7 +1124,21 @@ final class GuideCategoryBarView: UIView {
         collectionView.frame = bounds
         // The fade reads the content size, which the first pass has yet to measure.
         collectionView.layoutIfNeeded()
+        revealSelectionIfNeeded()
         updateEdgeMask()
+    }
+
+    /// Set when the pills load: the selected one is scrolled into view once
+    /// the bar has a width. A guide opened on a category far down the list
+    /// otherwise shows only the first pills.
+    private var revealsSelection = false
+
+    private func revealSelectionIfNeeded() {
+        guard revealsSelection, bounds.width > 0 else { return }
+        revealsSelection = false
+        guard selectedGroup != nil,
+              let index = items.firstIndex(where: { !$0.isAction && $0.group == selectedGroup }) else { return }
+        collectionView.scrollToItem(at: IndexPath(item: index, section: 0), at: .centeredHorizontally, animated: false)
     }
 
     /// How strongly each end fades, from 0 to 1: nothing beyond that end means
@@ -1134,6 +1195,8 @@ final class GuideCategoryBarView: UIView {
         if itemsChanged {
             collectionView.reloadData()
             collectionView.layoutIfNeeded()
+            revealsSelection = true
+            revealSelectionIfNeeded()
             updateEdgeMask()
         } else if selectionChanged {
             refreshVisiblePills()
