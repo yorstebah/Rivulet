@@ -281,7 +281,7 @@ extension XtreamService {
     nonisolated static func splitTags(_ name: String) -> (name: String, tags: [String]) {
         var rest = Substring(name)
         var tags: [String] = []
-        let tag = #"^\s*(?:┃[^┃|\n]{1,12}[┃|]|┃[A-Z]{2,5}(?=\s)|\|\s*[A-Z0-9+-]{2,8}\s*[┃|]|\[[A-Z]{2}\]|[A-Z]{2,4}(?:-[A-Z0-9]{2,4})?\s*[┃|])\s*"#
+        let tag = #"^\s*(?:┃[^┃|\n]{1,20}[┃|]|┃[A-Z]{2,5}(?=\s)|\|\s*[A-Z0-9+-]{2,8}\s*[┃|]|\[[A-Z]{2}\]|[A-Z]{2,4}(?:-[A-Z0-9]{2,4})?\s*[┃|])\s*"#
         while let match = rest.range(of: tag, options: .regularExpression), match.upperBound < rest.endIndex {
             let text = rest[match].trimmingCharacters(in: CharacterSet(charactersIn: "┃|[]").union(.whitespaces))
             if !text.isEmpty { tags.append(text) }

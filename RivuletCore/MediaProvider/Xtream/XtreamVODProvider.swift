@@ -299,7 +299,7 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
             artwork: MediaArtwork(poster: info.posterURL ?? movie.posterURL, backdrop: info.backdropURL,
                                   thumbnail: info.posterURL ?? movie.posterURL, logo: nil),
             parentArtwork: nil, grandparentArtwork: nil,
-            editionTitle: movie.tag,
+            editionTitle: ContentOrigin.badge(forTag: movie.tag),
             genres: XtreamVODMapping.genres(info.genre),
             externalIDs: info.tmdbId.map { ["tmdb": $0] },
             libraryID: XtreamVODLibrary.movies.rawValue)

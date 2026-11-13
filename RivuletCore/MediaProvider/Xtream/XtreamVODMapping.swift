@@ -125,8 +125,8 @@ nonisolated enum XtreamVODMapping {
             userState: userState(state.records[key], favorite: state.favorites.contains(key)),
             artwork: MediaArtwork(poster: movie.posterURL, backdrop: nil, thumbnail: movie.posterURL, logo: nil),
             parentArtwork: nil, grandparentArtwork: nil,
-            // The poster's edition badge tells a film's language copies apart.
-            editionTitle: movie.tag,
+            // The poster's edition badge tells a film's language copies apart ("🇳🇱").
+            editionTitle: ContentOrigin.badge(forTag: movie.tag),
             libraryID: XtreamVODLibrary.movies.rawValue)
     }
 
@@ -140,7 +140,7 @@ nonisolated enum XtreamVODMapping {
             artwork: MediaArtwork(poster: series.coverURL, backdrop: series.backdropURL,
                                   thumbnail: series.coverURL, logo: nil),
             parentArtwork: nil, grandparentArtwork: nil,
-            editionTitle: series.tag,
+            editionTitle: ContentOrigin.badge(forTag: series.tag),
             genres: genres(series.genre),
             libraryID: XtreamVODLibrary.series.rawValue)
     }
@@ -191,7 +191,7 @@ nonisolated enum XtreamVODMapping {
         MediaItem(
             ref: MediaItemRef(providerID: provider,
                               itemID: XtreamVODID.category(library: library, id: category.id).itemID),
-            kind: .collection, title: category.name, sortTitle: nil, overview: nil, year: nil, runtime: nil,
+            kind: .collection, title: ContentOrigin.marked(category.name), sortTitle: nil, overview: nil, year: nil, runtime: nil,
             parentRef: nil, grandparentRef: nil, episodeNumber: nil, seasonNumber: nil, childProgress: nil,
             userState: userState(nil),
             artwork: MediaArtwork(poster: poster, backdrop: nil, thumbnail: poster, logo: nil),

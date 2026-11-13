@@ -221,8 +221,8 @@ actor XtreamVODCatalog {
 
     private func file(_ name: String) -> URL? {
         let safe = sourceID.map { $0.isLetter || $0.isNumber ? $0 : "_" }
-        // v3: names without their tags or year, which moved to their own fields.
-        return directory?.appending(component: "\(String(safe))-\(name)-v3.json")
+        // v4: names without their tags or year, which moved to their own fields (v4: long tags too).
+        return directory?.appending(component: "\(String(safe))-\(name)-v4.json")
     }
 
     private func read<T: Codable & Sendable>(_ name: String) -> XtreamVODLists<T>? {
@@ -240,7 +240,7 @@ actor XtreamVODCatalog {
     nonisolated static func forget(sourceID: String, directory: URL? = defaultDirectory) {
         guard let directory else { return }
         let safe = String(sourceID.map { $0.isLetter || $0.isNumber ? $0 : "_" })
-        for name in ["movies", "series", "movies-v2", "series-v2", "movies-v3", "series-v3"] {
+        for name in ["movies", "series", "movies-v2", "series-v2", "movies-v3", "series-v3", "movies-v4", "series-v4"] {
             try? FileManager.default.removeItem(at: directory.appending(component: "\(safe)-\(name).json"))
         }
     }

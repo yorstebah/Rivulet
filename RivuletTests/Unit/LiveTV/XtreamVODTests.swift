@@ -173,6 +173,7 @@ final class XtreamVODTests: XCTestCase {
         XCTAssertEqual(XtreamService.cleanName("┃VO| Heat"), "Heat")
         XCTAssertEqual(XtreamService.cleanName("[EN] ┃MULTI┃ Up"), "Up")
         XCTAssertEqual(XtreamService.cleanName("NL | Flikken Maastricht"), "Flikken Maastricht")
+        XCTAssertEqual(XtreamService.cleanName("┃MULTI / LINGO┃ NETFLIX"), "NETFLIX")
         XCTAssertEqual(XtreamService.cleanName("┃GR┃ Μάρκο Πόλο [Marco Polo: One Hundred Eyes]"), "Μάρκο Πόλο [Marco Polo: One Hundred Eyes]")
         // Not tags: a title's own words, and a name that is nothing else.
         XCTAssertEqual(XtreamService.cleanName("Mission: Impossible"), "Mission: Impossible")
