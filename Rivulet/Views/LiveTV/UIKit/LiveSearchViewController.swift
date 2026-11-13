@@ -69,6 +69,7 @@ final class LiveSearchViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         rebuildIndex()
+        minuteTimer?.invalidate()
         // What airs now moves on; the index holds it.
         let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.rebuildIndex() }

@@ -221,7 +221,7 @@ final class LiveListViewController: UIViewController {
     /// comes off it is there to take focus.
     private func closeGuide(_ back: LiveListReturn) {
         guard let guide else { return }
-        if let id = list.categoryId(for: back.target) {
+        if let id = list.categoryId(backFrom: back.target, openedFrom: selectedId, channelId: back.channelId) {
             selectCategory(id)
             categoryView.preferredFocusIndexPath = categoryData.indexPath(for: id)
         }

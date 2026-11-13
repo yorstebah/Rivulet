@@ -276,6 +276,18 @@ struct LiveCategoryList {
         }
         return match?.id
     }
+
+    /// The row to come back on from a guide opened from `openerId`. The guide
+    /// still on that row's tab, on a channel the row holds, comes back to the
+    /// row itself: Recently Watched and a pinned copy share their tab with
+    /// another row, which would otherwise take the selection.
+    func categoryId(backFrom target: LiveGuideTarget, openedFrom openerId: String?, channelId: String?) -> String? {
+        if let openerId, guideTarget(for: openerId) == target,
+           channelId.map({ id in (members[openerId] ?? []).contains { lineup[$0].id == id } }) ?? true {
+            return openerId
+        }
+        return categoryId(for: target)
+    }
 }
 
 extension LiveTVDataStore {

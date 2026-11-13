@@ -211,6 +211,22 @@ final class LiveCategoryListTests: XCTestCase {
         XCTAssertEqual(list.categoryId(for: LiveGuideTarget(sourceId: nil, tab: .group("Kids"))), "group|x|Kids")
     }
 
+    func test_backFromGuide_onTheSameTab_staysOnTheRowItOpenedFrom() {
+        let channels = [ch("a", "Kids", source: "x"), ch("b", "Kids", source: "m")]
+        let key = LiveCategoryList.pinKey(sourceId: "m", title: "Kids")
+        let list = build(channels, sources: [("x", "A"), ("m", "B")], recents: ["m:b"], pins: [key])
+        let all = LiveGuideTarget(sourceId: nil, tab: .all)
+        // Recently Watched opens All Channels; unchanged, it comes back to itself.
+        XCTAssertEqual(list.categoryId(backFrom: all, openedFrom: "recent", channelId: "m:b"), "recent")
+        // On a channel it does not hold, the tab's own row has it.
+        XCTAssertEqual(list.categoryId(backFrom: all, openedFrom: "recent", channelId: "x:a"), "all|")
+        let kids = LiveGuideTarget(sourceId: "m", tab: .group("Kids"))
+        XCTAssertEqual(list.categoryId(backFrom: kids, openedFrom: "pin|\(key)", channelId: "m:b"), "pin|\(key)")
+        // Another tab chosen in the guide: that tab's row.
+        XCTAssertEqual(list.categoryId(backFrom: LiveGuideTarget(sourceId: "m", tab: .all),
+                                       openedFrom: "pin|\(key)", channelId: "m:b"), "all|m")
+    }
+
     // MARK: - Now and next
 
     func test_nowNext_skipsPlaceholders_andMeasuresProgress() {
