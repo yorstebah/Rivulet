@@ -1765,10 +1765,11 @@ enum DebugFocusDriver {
         state("move-0")
         try? await Task.sleep(for: .seconds(2))
         for (index, word) in spec.split(separator: ",").enumerated() {
-            if word.hasPrefix("l"), ["lup", "ldown", "lhide", "linfo", "lchan", "lmenu"].contains(word),
+            if word.hasPrefix("l"), ["lup", "ldown", "lright", "lleft", "lhide", "linfo", "lchan", "lmenu"].contains(word),
                let live = LiveTVAetherPlayerViewController.debugCurrent {
                 switch word {
                 case "lup", "ldown": live.debugHiddenDirection(up: word == "lup")
+                case "lright", "lleft": live.debugHiddenDirection(right: word == "lright")
                 case "lhide": live.debugHideRail()
                 case "linfo", "lchan": live.debugPresent(word == "linfo" ? "info" : "channels")
                 default: live.debugMenu()
