@@ -227,6 +227,20 @@ final class LiveCategoryListTests: XCTestCase {
                                        openedFrom: "pin|\(key)", channelId: "m:b"), "all|m")
     }
 
+    // MARK: - Group names
+
+    func test_groupNames_withoutTags_unlessTwoWouldReadTheSame() {
+        let names = LiveGroupDisplay.names(["| PPV | UFC PPV", "| UK | SPORTS", "| US | SPORTS", "Kids"])
+        XCTAssertEqual(names["| PPV | UFC PPV"], "UFC PPV")
+        XCTAssertEqual(names["| UK | SPORTS"], "| UK | SPORTS")
+        XCTAssertEqual(names["Kids"], "Kids")
+        let list = build([ch("a", "| NL | NEDERLAND HD"), ch("b", "| NL | NEDERLAND HD")])
+        let group = list.categories.first { $0.kind == .group("| NL | NEDERLAND HD") }
+        XCTAssertEqual(group?.title, "NEDERLAND HD")
+        // Still opened and matched by its own title.
+        XCTAssertEqual(group.flatMap { list.guideTarget(for: $0.id) }?.tab, .group("| NL | NEDERLAND HD"))
+    }
+
     // MARK: - Numbers
 
     func test_xtreamNumbers_areNotShown_otherSourcesKeepTheirs() {

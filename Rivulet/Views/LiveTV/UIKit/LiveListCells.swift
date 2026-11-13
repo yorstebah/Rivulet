@@ -170,7 +170,8 @@ final class LiveChannelRowCell: UICollectionViewCell {
         nameLabel.text = channel.displayNumberAndName
         // The category, then the picture and sound as last played ("Sport · 1080p · Stereo").
         let quality = LiveStreamQualityStore.shared.quality(for: channel.id)?.labels ?? []
-        let detail = ([LiveGroupOrder.trimmed(channel.groupTitle)].compactMap { $0 } + quality).joined(separator: " · ")
+        let group = LiveGroupOrder.trimmed(channel.groupTitle).map(LiveGroupDisplay.name)
+        let detail = ([group].compactMap { $0 } + quality).joined(separator: " · ")
         groupLabel.text = detail.isEmpty ? nil : detail
         if let current = nowNext.current {
             programLabel.text = current.displayTitle

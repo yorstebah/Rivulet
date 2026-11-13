@@ -1054,7 +1054,11 @@ final class GuideCategoryBarView: UIView {
         var isAction = false
     }
 
-    private var items: [Item] = []
+    private var items: [Item] = [] {
+        didSet { displayNames = LiveGroupDisplay.names(items.map(\.title)) }
+    }
+    /// The pills' text: group names without the list's tags (`LiveGroupDisplay`).
+    private var displayNames: [String: String] = [:]
     private var selectedGroup: String?
     private var onSelect: ((String?) -> Void)?
     private var onAction: (() -> Void)?
@@ -1208,7 +1212,7 @@ final class GuideCategoryBarView: UIView {
             guard let item = items[safe: indexPath.item],
                   let cell = collectionView.cellForItem(at: indexPath) as? GuideCategoryPillCell
             else { continue }
-            cell.configure(title: item.title, selected: !item.isAction && item.group == selectedGroup)
+            cell.configure(title: displayNames[item.title] ?? item.title, selected: !item.isAction && item.group == selectedGroup)
         }
     }
 
@@ -1248,7 +1252,7 @@ extension GuideCategoryBarView: UICollectionViewDataSource,
             withReuseIdentifier: GuideCategoryPillCell.reuseIdentifier,
             for: indexPath) as! GuideCategoryPillCell
         if let item = items[safe: indexPath.item] {
-            cell.configure(title: item.title, selected: !item.isAction && item.group == selectedGroup)
+            cell.configure(title: displayNames[item.title] ?? item.title, selected: !item.isAction && item.group == selectedGroup)
         }
         cell.onDeclinedDownPress = { [weak self] in
             self?.onMoveDown?()

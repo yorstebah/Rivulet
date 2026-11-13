@@ -200,6 +200,13 @@ struct LiveCategoryList {
             addGroups(of: Array(lineup.indices), sourceId: nil)
         }
 
+        // Groups read without the list's tags where that leaves them apart.
+        let groupNames = LiveGroupDisplay.names(rows.compactMap { if case .group(let title) = $0.kind { title } else { nil } })
+        rows = rows.map { row in
+            guard case .group(let title) = row.kind, let name = groupNames[title], name != row.title else { return row }
+            return LiveCategory(id: row.id, kind: row.kind, title: name, sourceId: row.sourceId,
+                                channelCount: row.channelCount, pinKey: row.pinKey)
+        }
         return LiveCategoryList(categories: rows.filter { !folded.contains($0.id) }, sourceIdFilter: filter,
                                 lineup: lineup, allRows: rows, members: members)
     }
