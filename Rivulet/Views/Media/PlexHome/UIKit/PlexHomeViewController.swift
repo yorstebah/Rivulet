@@ -3027,7 +3027,11 @@ final class PlexHomeViewController: UIViewController {
         case .searchPeople:
             return makeHubSectionLayout(section: section, isContinueWatching: false, tile: MediaRowMetrics.person)
         case .searchLive:
-            return makeHubSectionLayout(section: section, isContinueWatching: false, tile: MediaRowMetrics.liveCard)
+            // The card grows further on focus than a poster, and the shelf insets are measured
+            // for posters: without more room the focused card covers the row's title.
+            let layout = makeHubSectionLayout(section: section, isContinueWatching: false, tile: MediaRowMetrics.liveCard)
+            layout.contentInsets.top += 28
+            return layout
         case .recommendationsLoading, .recommendationsError:
             return makeRecommendationsStateLayout()
         case .sortHeader:
