@@ -33,12 +33,15 @@ final class AVKitScrubProbe: NSObject {
     /// server's Plex DVR (a transient source) and runs RIVULET_AUTOPLAY_MOVES.
     static func runLive(env: [String: String]) async {
         let auth = PlexAuthManager.shared
-        for _ in 0..<60 where auth.selectedServerURL == nil || auth.selectedServerToken == nil {
-            try? await Task.sleep(for: .milliseconds(500))
-        }
-        guard let serverURL = auth.selectedServerURL, let token = auth.selectedServerToken else { return }
         let store = LiveTVDataStore.shared
-        store.debugAddTransientSource(PlexLiveTVProvider(serverURL: serverURL, authToken: token, serverName: "Debug"))
+        // With saved Live TV sources, play from them; otherwise from the Plex server's DVR.
+        if store.sources.isEmpty {
+            for _ in 0..<60 where auth.selectedServerURL == nil || auth.selectedServerToken == nil {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            guard let serverURL = auth.selectedServerURL, let token = auth.selectedServerToken else { return }
+            store.debugAddTransientSource(PlexLiveTVProvider(serverURL: serverURL, authToken: token, serverName: "Debug"))
+        }
         await store.loadChannels()
         for _ in 0..<60 where store.channels.isEmpty { try? await Task.sleep(for: .milliseconds(500)) }
         await store.loadEPG(startDate: Date(), hours: 6)
