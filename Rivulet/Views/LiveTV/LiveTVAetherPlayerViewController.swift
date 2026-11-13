@@ -214,6 +214,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         override var canBecomeFocused: Bool { true }
     }
     private let focusCatcher = FocusCatcherView()
+    /// The rail shows once as each channel's picture first appears.
+    private var didShowRailOnJoin = false
 
     /// One front door for transport input. A Play/Pause can reach this VC as a
     /// press and ALSO as a system remote command for the same click; both go
@@ -399,6 +401,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     private func startPlayback() {
         loadingSpinner.startAnimating()
         isUserPaused = false
+        didShowRailOnJoin = false
 
         // Sticky per-channel subtitle delay (OSD stepper). Re-read per channel:
         // the key is derived from the channel id.
@@ -469,6 +472,12 @@ final class LiveTVAetherPlayerViewController: UIViewController {
                 guard let self else { return }
                 self.loadingSpinner.stopAnimating()
                 self.finishJoinTelemetry { $0.joined(codec: self.aetherPlayer?.sourceVideoCodecName) }
+                // As the TV app does on tuning: the channel and what is on, then the rail fades
+                // by itself. Once per channel, and not over a panel or the description.
+                if !self.didShowRailOnJoin, self.activePanel == nil, self.descriptionOverlay == nil {
+                    self.didShowRailOnJoin = true
+                    self.showRail()
+                }
             }
             .store(in: &cancellables)
 
