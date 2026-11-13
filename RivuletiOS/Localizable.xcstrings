@@ -17,6 +17,7 @@
         }
       }
     },
+    "Movies and TV Shows" : {},
     "On This Day" : {
       "localizations" : {
         "de" : {
@@ -81,6 +82,8 @@
         }
       }
     },
+    "TMDB API Key" : {},
+    "The provider's films and series appear as Movies and TV Shows libraries. With your own free key from themoviedb.org, their pages show the plot in your language, the cast with photos and more." : {},
     "Unfavorite" : {
       "localizations" : {
         "de" : {
