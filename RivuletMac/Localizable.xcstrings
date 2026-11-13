@@ -16,6 +16,7 @@
     "Ex-Yugoslav" : {},
     "International" : {},
     "Its channels stay where they are." : {},
+    "List" : {},
     "List Name" : {},
     "Map" : {
       "localizations" : {
@@ -41,6 +42,7 @@
     "New List…" : {},
     "New Smart List" : {},
     "New Smart List…" : {},
+    "Next: %@ at %@" : {},
     "On This Day" : {
       "localizations" : {
         "de" : {
@@ -77,6 +79,7 @@
     "Rename List" : {},
     "Rename “%@”…" : {},
     "Save" : {},
+    "Search Channels" : {},
     "Slideshow" : {
       "localizations" : {
         "de" : {

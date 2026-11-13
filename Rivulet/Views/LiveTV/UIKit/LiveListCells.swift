@@ -102,7 +102,6 @@ final class LiveChannelRowCell: UICollectionViewCell {
     /// The platter reaches past the row, as on the folder and track rows.
     static let platterOutset = FolderRowCell.platterOutset
 
-    private static let timeFormat = Date.FormatStyle.dateTime.hour().minute()
     private static let logoSize = CGSize(width: 128, height: 72)
 
     private let platter = MusicFocusPlatterView()
@@ -168,21 +167,16 @@ final class LiveChannelRowCell: UICollectionViewCell {
     /// With no guide data the row is the channel alone: no bar, no empty line.
     func configure(_ channel: UnifiedChannel, nowNext: LiveNowNext, now: Date = Date()) {
         nameLabel.text = channel.displayNumberAndName
-        // The picture and sound first ("1080p · Stereo · Sport"): a long category is what
-        // the line cuts short, never the quality.
-        let quality = LiveStreamQualityStore.shared.quality(for: channel.id)?.labels ?? []
-        let group = LiveGroupOrder.trimmed(channel.groupTitle).map(LiveGroupDisplay.name)
-        let detail = (quality + [group].compactMap { $0 }).joined(separator: " · ")
-        groupLabel.text = detail.isEmpty ? nil : detail
+        groupLabel.text = LiveListText.detail(channel)
         if let current = nowNext.current {
             programLabel.text = current.displayTitle
-            timeLabel.text = "\(current.startTime.formatted(Self.timeFormat)) – \(current.endTime.formatted(Self.timeFormat))"
+            timeLabel.text = LiveListText.times(current)
         } else {
             programLabel.text = nil
             timeLabel.text = nil
         }
         if let next = nowNext.next {
-            nextLabel.text = String(localized: "Next: \(next.displayTitle) at \(next.startTime.formatted(Self.timeFormat))")
+            nextLabel.text = LiveListText.next(next)
         } else {
             nextLabel.text = nil
         }

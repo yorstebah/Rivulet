@@ -13,10 +13,18 @@ import Foundation
 enum LiveLayout: String, CaseIterable {
     case browse = "Browse"
     case guide = "Guide"
+    /// Categories, then their channels with what is on: the tvOS List layout. Same stored value.
+    case list = "List"
 
     static let storageKey = "liveTVLayout"
 
-    var title: String { self == .browse ? String(localized: "What's On") : String(localized: "Guide") }
+    var title: String {
+        switch self {
+        case .browse: String(localized: "What's On")
+        case .guide: String(localized: "Guide")
+        case .list: String(localized: "List")
+        }
+    }
 }
 
 /// A programme the sheet describes. `program` is nil for a channel with no guide data.

@@ -96,6 +96,14 @@ struct MacLiveTVView: View {
                     banner
                     guide
                 }
+            case .list:
+                VStack(spacing: 0) {
+                    banner
+                    MacLiveListView(mode: .page, onPick: play, menu: { channel in
+                        LiveMenu.sections(channel: channel, program: store.getCurrentProgram(for: channel),
+                                          recorder: recorder, watch: play, details: { selection = $0 })
+                    }, canProbe: { playback.session == nil })
+                }
             }
         }
     }

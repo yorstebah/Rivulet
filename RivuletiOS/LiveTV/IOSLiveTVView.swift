@@ -107,6 +107,12 @@ struct IOSLiveTVView: View {
                     guide
                 }
                 .safeAreaBar(edge: .top) { layoutPicker }
+            case .list:
+                IOSLiveListView(mode: .tab, onPick: play, menu: { channel in
+                    LiveMenu.sections(channel: channel, program: store.getCurrentProgram(for: channel),
+                                      recorder: recorder, watch: play, details: { selection = $0 })
+                }, canProbe: { playback.session == nil })
+                .safeAreaBar(edge: .top) { layoutPicker }
             }
         }
     }
