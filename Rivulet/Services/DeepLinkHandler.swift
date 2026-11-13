@@ -74,8 +74,11 @@ final class DeepLinkHandler: ObservableObject {
     func handle(_ link: RivuletLink) -> Task<Void, Never>? {
         // Signed out there is nothing to wait for: holding it would fire at the next sign-in.
         guard isSignedIn() || providerID(of: link) != nil else { return nil }
-        // Any app can open a link, and the key is interpolated into a server path.
-        guard link.ratingKey.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { return nil }
+        // Any app can open a link, and a Plex key is interpolated into a server path. Another
+        // server's id goes only to its own provider, and ids there join parts ("m|123").
+        let separators: Set<Character> = providerID(of: link) != nil ? ["|", "-", "_", "."] : []
+        guard link.ratingKey.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || separators.contains($0)) })
+        else { return nil }
         DiagLog.notice(.deepLink, "Link \(link.action) \(link.ratingKey) on \(providerID(of: link).map { String($0.prefix { $0 != ":" }) } ?? "selected plex"), shell ready=\(isShellReady)")
         heldLink = link
         return deliverHeldLink()

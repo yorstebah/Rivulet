@@ -142,6 +142,20 @@ final class DeepLinkHandlerDetailTests: XCTestCase {
         }
     }
 
+    /// Another server's ids join parts ("m|123", an Xtream film); its provider resolves them. A
+    /// Plex key keeps the strict check, and nothing that reshapes a path gets through either way.
+    func testProviderIdsWithSeparatorsAreKept_plexKeysAreNot() {
+        let handler = makeHandler { key, _ in self.metadata(key) }
+        // Held until the shell is ready, which is how a kept link shows here.
+        _ = handler.handle(RivuletLink(.detail, ratingKey: "m|123", server: "xtream:abc"))
+        XCTAssertEqual(handler.heldLink?.ratingKey, "m|123")
+        handler.dropHeldLink()
+        XCTAssertNil(handler.handle(RivuletLink(.detail, ratingKey: "m|123")))
+        XCTAssertNil(handler.heldLink)
+        XCTAssertNil(handler.handle(RivuletLink(.detail, ratingKey: "../m|1", server: "xtream:abc")))
+        XCTAssertNil(handler.heldLink)
+    }
+
     /// The provider prefixes come from `MediaProviderKind`, so a new kind needs no edit here.
     func testEveryOtherServerKindIsAProviderLink() {
         let handler = makeHandler { key, _ in self.metadata(key) }
