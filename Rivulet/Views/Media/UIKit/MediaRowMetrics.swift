@@ -48,10 +48,10 @@ enum MediaRowMetrics {
         var lockup = Lockup.poster
         /// Growth on focus (width, height), measured on device, tvOS 27.
         var growth = CGSize(width: MediaRowMetrics.focusGrowth, height: MediaRowMetrics.focusGrowth)
-        /// Room under the frame for the title line (`PosterTitleLabel`); 0 for tiles with none.
+        /// Room under the frame for the focused title and year (`PosterCaptionView`); 0 for tiles with none.
         var caption: CGFloat = 0
 
-        /// The cell's height: the frame and the title line under it.
+        /// The cell's height: the frame and the caption room under it.
         var cellHeight: CGFloat { frame.height + caption }
 
         /// Whole points: compositional layout floors a fractional item width,
@@ -90,8 +90,8 @@ enum MediaRowMetrics {
                     caption: posterCaption)
     }()
 
-    /// The title line under a poster or square tile, as Apple's App Store and Music lockups have.
-    static let posterCaption: CGFloat = 40
+    /// Room for the title and year shown under the focused poster or square tile.
+    static let posterCaption: CGFloat = 64
     static let posterWidth = poster.frame.width
     static let posterHeight = poster.frame.height
 
@@ -176,7 +176,7 @@ enum MediaRowMetrics {
     }
 
     /// Library poster grid: artwork top to the next row's artwork top (Apple's 55 between 390-tall tiles).
-    /// The title line under each poster adds its height.
+    /// The caption room under each poster adds its height.
     static var posterGridPitch: CGFloat { poster.art.height + 55 + poster.caption }
 }
 

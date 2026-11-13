@@ -25,7 +25,7 @@ final class WatchlistPosterCell: UICollectionViewCell {
 
     private let cornerRadius = RoundedPoster.cornerRadius
     private let tile = MediaRowMetrics.poster
-    private let titleLabel = PosterTitleLabel()
+    private let caption = PosterCaptionView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -66,14 +66,14 @@ final class WatchlistPosterCell: UICollectionViewCell {
 
         // Insert placeholder below the poster view so the image covers it.
         contentView.insertSubview(placeholderView, belowSubview: posterView)
-        contentView.addSubview(titleLabel)
+        contentView.addSubview(caption)
 
         NSLayoutConstraint.activate([
-            // Raised by half the title line, which the cell is that much taller for.
+            // Raised by half the caption room, which the cell is that much taller for.
             posterView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor, constant: -tile.caption / 2),
-            titleLabel.topAnchor.constraint(equalTo: posterView.centerYAnchor, constant: PosterTitleLabel.topOffset(for: tile)),
-            titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            titleLabel.widthAnchor.constraint(equalTo: posterView.imageView.widthAnchor),
+            caption.topAnchor.constraint(equalTo: posterView.centerYAnchor, constant: PosterCaptionView.topOffset(for: tile)),
+            caption.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            caption.widthAnchor.constraint(equalTo: posterView.imageView.widthAnchor),
             posterView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             posterView.widthAnchor.constraint(equalToConstant: tile.hostSize.width),
             posterView.heightAnchor.constraint(equalToConstant: tile.hostSize.height),
@@ -98,7 +98,7 @@ final class WatchlistPosterCell: UICollectionViewCell {
                       || context.nextFocusedView?.isDescendant(of: self) == true
         coordinator.addCoordinatedAnimations({
             self.posterView.transform = nowFocused ? self.tile.focusScale : .identity
-            self.titleLabel.setFocused(nowFocused)
+            self.caption.setFocused(nowFocused)
         }, completion: nil)
     }
 
@@ -118,13 +118,13 @@ final class WatchlistPosterCell: UICollectionViewCell {
         let iconName = item.type == .movie ? "film" : "tv"
         let icon = UIImage(systemName: iconName)?
             .withConfiguration(UIImage.SymbolConfiguration(pointSize: 32, weight: .light))
-        titleLabel.text = item.title
+        caption.configure(title: item.title, year: item.year)
         loadImage(from: item.posterURL, failureIcon: icon)
     }
 
     /// MediaItem path. Artwork URLs are already resolved — no serverURL/token needed.
     func configure(item: MediaItem) {
-        titleLabel.text = item.title
+        caption.configure(title: item.title, year: item.year)
         loadImage(from: item.artwork.poster, failureIcon: failureIconImage(for: item.kind))
     }
 
