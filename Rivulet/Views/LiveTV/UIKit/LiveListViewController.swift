@@ -122,6 +122,12 @@ final class LiveListViewController: UIViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateEmptyState() }
             .store(in: &cancellables)
+        // A channel's quality, noted while it played.
+        LiveStreamQualityStore.shared.$byChannel
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshVisibleRows() }
+            .store(in: &cancellables)
         // The viewer's own lists and pins, changed from a hold menu here or elsewhere.
         let lists = LiveChannelListStore.shared
         lists.$lists.map { _ in () }.merge(with: lists.$pinnedCategoryKeys.map { _ in () })

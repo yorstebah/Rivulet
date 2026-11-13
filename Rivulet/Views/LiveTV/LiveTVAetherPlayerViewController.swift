@@ -494,6 +494,19 @@ final class LiveTVAetherPlayerViewController: UIViewController {
             }
             .store(in: &cancellables)
 
+        // The channel's picture and sound, for the channel lists (`LiveStreamQualityStore`).
+        // The size is zero on the software path; then only the sound is noted.
+        Publishers.CombineLatest3(aether.$videoSize, aether.$audioTracks, aether.$activeAudioTrackId)
+            .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
+            .sink { [weak self] size, audio, audioId in
+                guard let self else { return }
+                let track = audio.first { $0.id == audioId } ?? audio.first { $0.isDefault } ?? audio.first
+                LiveStreamQualityStore.shared.record(channelId: self.channel.id,
+                                                     height: size.height > 0 ? Int(size.height.rounded()) : nil,
+                                                     audioChannels: track?.channels)
+            }
+            .store(in: &cancellables)
+
         // Keep the rail's audio meta line current as the engine reports tracks.
         aether.$audioTracks
             .receive(on: DispatchQueue.main)

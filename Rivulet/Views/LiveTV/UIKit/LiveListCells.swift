@@ -93,8 +93,8 @@ final class LiveCategoryCell: UICollectionViewCell {
 
 // MARK: - Channel row
 
-/// Logo, name and group on the left; what is on now, its times, progress and
-/// what is next on the right. No background at rest; the glass platter on focus.
+/// Logo, name, and group with the quality last played on the left; what is on
+/// now, its times, progress and what is next on the right. No background at rest; the glass platter on focus.
 @MainActor
 final class LiveChannelRowCell: UICollectionViewCell {
     static let reuseID = "LiveChannelRowCell"
@@ -168,7 +168,10 @@ final class LiveChannelRowCell: UICollectionViewCell {
     /// With no guide data the row is the channel alone: no bar, no empty line.
     func configure(_ channel: UnifiedChannel, nowNext: LiveNowNext, now: Date = Date()) {
         nameLabel.text = channel.displayNumberAndName
-        groupLabel.text = LiveGroupOrder.trimmed(channel.groupTitle)
+        // The category, then the picture and sound as last played ("Sport · 1080p · Stereo").
+        let quality = LiveStreamQualityStore.shared.quality(for: channel.id)?.labels ?? []
+        let detail = ([LiveGroupOrder.trimmed(channel.groupTitle)].compactMap { $0 } + quality).joined(separator: " · ")
+        groupLabel.text = detail.isEmpty ? nil : detail
         if let current = nowNext.current {
             programLabel.text = current.displayTitle
             timeLabel.text = "\(current.startTime.formatted(Self.timeFormat)) – \(current.endTime.formatted(Self.timeFormat))"
