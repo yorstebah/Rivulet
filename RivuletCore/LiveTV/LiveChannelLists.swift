@@ -19,6 +19,17 @@ struct LiveChannelList: Codable, Hashable, Identifiable {
     let id: String
     var name: String
     var channelIds: [String]
+    /// A smart list's rules: it holds the channels they match, and `channelIds` stays empty.
+    var rules: LiveSmartRules?
+
+    var isSmart: Bool { rules != nil }
+
+    /// The list's channels in `lineup`: a smart list's matches in lineup order, else its own in its order.
+    func channels(in lineup: [UnifiedChannel], epg: [String: [UnifiedProgram]] = [:]) -> [UnifiedChannel] {
+        if let rules { return rules.channels(in: lineup, epg: epg) }
+        let byId = Dictionary(lineup.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return channelIds.compactMap { byId[$0] }
+    }
 
     /// The list's tab in the guide, whose tabs go by title: its name, or "Name (List)"
     /// when a channel group, a source or Favorites already has that name.
@@ -61,6 +72,24 @@ final class LiveChannelListStore: ObservableObject {
         return list
     }
 
+    /// A new smart list. A blank name or no rules make none.
+    @discardableResult
+    func createSmartList(named name: String, rules: LiveSmartRules) -> LiveChannelList? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !rules.isEmpty else { return nil }
+        let list = LiveChannelList(id: UUID().uuidString, name: trimmed, channelIds: [], rules: rules)
+        lists.append(list)
+        saveLists()
+        return list
+    }
+
+    /// A smart list's new rules. A list keeps at least one.
+    func setRules(_ rules: LiveSmartRules, for listId: String) {
+        guard !rules.isEmpty, let index = lists.firstIndex(where: { $0.id == listId }), lists[index].isSmart else { return }
+        lists[index].rules = rules
+        saveLists()
+    }
+
     func rename(_ listId: String, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let index = lists.firstIndex(where: { $0.id == listId }) else { return }
@@ -75,7 +104,7 @@ final class LiveChannelListStore: ObservableObject {
 
     /// Adds the channel at the end, or takes it out when it is already there.
     func toggle(_ channelId: String, in listId: String) {
-        guard let index = lists.firstIndex(where: { $0.id == listId }) else { return }
+        guard let index = lists.firstIndex(where: { $0.id == listId }), !lists[index].isSmart else { return }
         if let position = lists[index].channelIds.firstIndex(of: channelId) {
             lists[index].channelIds.remove(at: position)
         } else {

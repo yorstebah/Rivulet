@@ -102,6 +102,8 @@ struct LiveCategoryList {
         var lists: [LiveChannelList] = []
         /// Pinned groups (`pinKey`), in the order they were pinned.
         var pinnedKeys: [String] = []
+        /// The guide, for a smart list's genre rule.
+        var epg: [String: [UnifiedProgram]] = [:]
     }
 
     /// The column's rows in order, source headers included.
@@ -144,7 +146,9 @@ struct LiveCategoryList {
             positions: favorites.compactMap { position[$0.id] })
         // The viewer's own lists, each in the order its channels were added.
         for list in input.lists {
-            add(.list(list.id), title: list.name, sourceId: nil, positions: list.channelIds.compactMap { position[$0] })
+            let positions = list.rules.map { $0.indices(in: lineup, epg: input.epg) }
+                ?? list.channelIds.compactMap { position[$0] }
+            add(.list(list.id), title: list.name, sourceId: nil, positions: positions)
         }
         add(.all, title: String(localized: "All Channels"), sourceId: nil, positions: Array(lineup.indices))
 
@@ -307,6 +311,7 @@ extension LiveTVDataStore {
             recentChannelIds: recentChannelIds,
             sourceIdFilter: sourceIdFilter, collapsedSourceIds: collapsedSourceIds,
             lists: LiveChannelListStore.shared.lists,
-            pinnedKeys: LiveChannelListStore.shared.pinnedCategoryKeys))
+            pinnedKeys: LiveChannelListStore.shared.pinnedCategoryKeys,
+            epg: epg))
     }
 }

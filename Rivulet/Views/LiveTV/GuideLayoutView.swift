@@ -105,7 +105,10 @@ struct GuideLayoutView: View {
     /// The viewer's own lists with a channel here, each a tab after Favorites.
     private var ownLists: [LiveChannelList] {
         let present = Set(sourceChannels.map(\.id))
-        return channelLists.lists.filter { $0.channelIds.contains(where: present.contains) }
+        return channelLists.lists.filter { list in
+            list.isSmart ? !list.channels(in: sourceChannels, epg: dataStore.epg).isEmpty
+                : list.channelIds.contains(where: present.contains)
+        }
     }
 
     /// Titles of the pinned groups here, in pin order: their tabs come next.
@@ -154,8 +157,7 @@ struct GuideLayoutView: View {
         // One of the viewer's own lists: its channels, in its order.
         let taken = takenTabNames
         if let list = ownLists.first(where: { $0.tabTitle(taken: taken) == group }) {
-            let byId = Dictionary(sourceChannels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            return list.channelIds.compactMap { byId[$0] }
+            return list.channels(in: sourceChannels, epg: dataStore.epg)
         }
         if let ids = sourceTabs[group] {
             return sourceChannels.filter { ids.contains($0.sourceId) }

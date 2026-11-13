@@ -137,7 +137,8 @@ enum LiveProgramMenu {
     /// or takes it off. "New List…" names a new one holding the channel.
     static func presentListChooser(for channel: UnifiedChannel, from presenter: UIViewController) {
         let lists = LiveChannelListStore.shared
-        let rows = lists.lists.map { list in
+        // A smart list fills itself; only the viewer's own lists take a channel.
+        let rows = lists.lists.filter { !$0.isSmart }.map { list in
             TileMenuAction(verbatim: list.name,
                            systemImage: list.channelIds.contains(channel.id) ? "checkmark" : "list.bullet") {
                 lists.toggle(channel.id, in: list.id)
@@ -191,7 +192,7 @@ enum LiveProgramMenu {
         }
     }
 
-    private static func topmost(from presenter: UIViewController) -> UIViewController {
+    static func topmost(from presenter: UIViewController) -> UIViewController {
         var top = presenter
         while let presented = top.presentedViewController, !presented.isBeingDismissed {
             top = presented

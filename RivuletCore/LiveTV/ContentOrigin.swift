@@ -32,14 +32,54 @@ nonisolated enum ContentOrigin {
 
     /// The flag, symbol or code for a tag ("NL", "FR-4K", "MULTI / LINGO"), nil when it names no place.
     static func marker(forTag tag: String) -> String? {
+        origin(forTag: tag).map(marker(forOrigin:))
+    }
+
+    /// The place a tag names, as a stable key: a region ("NL", "GB" for "UK"), a language
+    /// code ("AR") or a group ("MULTI"). What a smart list keeps.
+    static func origin(forTag tag: String) -> String? {
         let base = tag.uppercased()
             .split(whereSeparator: { $0 == " " || $0 == "/" || $0 == "-" }).first.map(String.init) ?? ""
-        if let symbol = symbols[base] { return symbol }
-        if languages.contains(base) { return base }
+        if symbols[base] != nil || languages.contains(base) { return base }
         let region = named[base] ?? base
         guard region.count == 2, region.allSatisfy({ $0.isASCII && $0.isLetter }),
               Locale.Region.isoRegions.contains(where: { $0.identifier == region }) else { return nil }
-        return flag(region)
+        return region
+    }
+
+    /// The first origin among a name's tags.
+    static func origin(forTags tags: [String]) -> String? {
+        tags.lazy.compactMap(origin(forTag:)).first
+    }
+
+    /// An origin's flag, symbol or code.
+    static func marker(forOrigin origin: String) -> String {
+        if let symbol = symbols[origin] { return symbol }
+        if languages.contains(origin) { return origin }
+        return flag(origin)
+    }
+
+    /// An origin as the viewer reads it: "🇳🇱 Netherlands", "Arabic", "🌐 Multilingual".
+    static func title(forOrigin origin: String) -> String {
+        let name: String
+        switch origin {
+        case "MULTI": name = String(localized: "Multilingual")
+        case "INT", "WORLD": name = String(localized: "International")
+        case "ASIA": name = String(localized: "Asia")
+        case "AFRICA": name = String(localized: "Africa")
+        default:
+            if languages.contains(origin) {
+                if origin == "VO" || origin == "VOSTFR" { return String(localized: "Original Version") }
+                if origin == "EXYU" || origin == "EX-YU" { return String(localized: "Ex-Yugoslav") }
+                let code = origin == "KURD" ? "ku" : origin.lowercased()
+                name = Locale.current.localizedString(forLanguageCode: code)
+                    .flatMap { $0.lowercased() == origin.lowercased() ? nil : $0 } ?? origin
+                // A language reads as its name alone; its code adds nothing beside it.
+                return name
+            }
+            name = Locale.current.localizedString(forRegionCode: origin) ?? origin
+        }
+        return "\(marker(forOrigin: origin)) \(name)"
     }
 
     /// The first marker among a name's tags.

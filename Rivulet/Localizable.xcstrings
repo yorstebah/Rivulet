@@ -2294,6 +2294,7 @@
         }
       }
     },
+    "Add Rule…" : {},
     "Add to List" : {},
     "Add to List…" : {},
     "Adds a For You row to What's On, with channels picked from what you watch. It learns on this Apple TV only." : {
@@ -2866,6 +2867,7 @@
         }
       }
     },
+    "Africa" : {},
     "After this many episodes play in a row, the next one waits for you instead of starting on its own." : {
       "localizations" : {
         "de" : {
@@ -3196,6 +3198,7 @@
         }
       }
     },
+    "Asia" : {},
     "Ask Plex for this server's latest status." : {
       "localizations" : {
         "de" : {
@@ -4652,7 +4655,19 @@
         }
       }
     },
+    "Country or Language" : {},
+    "Ex-Yugoslav" : {},
+    "International" : {},
     "Movies and TV Shows" : {},
+    "Multilingual" : {},
+    "Name Contains" : {},
+    "Name Contains “%@”" : {},
+    "Name Contains…" : {},
+    "New Smart List" : {},
+    "New Smart List…" : {},
+    "Original Version" : {},
+    "Smart List" : {},
+    "Source" : {},
     "TMDB API Key" : {},
     "TV Shows" : {},
     "The Guide lists every channel against the time. What's On shows rows of what is on now, with multiview, like the Apple TV app." : {
@@ -14592,6 +14607,7 @@
     },
     "The Guide lists every channel against the time. What's On shows rows of what is on now, with multiview, like the Apple TV app. List shows your categories beside their channels and what is on each." : {},
     "The provider's films and series, as Movies and TV Shows libraries in the sidebar and on Home. Off leaves only its channels." : {},
+    "Word in the Channel Name" : {},
     "Your Plex server's tuners. Select to see details or remove it." : {
       "localizations" : {
         "de" : {

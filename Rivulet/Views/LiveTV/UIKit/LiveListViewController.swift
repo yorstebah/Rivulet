@@ -169,6 +169,12 @@ final class LiveListViewController: UIViewController {
         // Again on each appear: handlers are asked newest first.
         MenuPressInterceptor.register(self)
         #if DEBUG
+        // RIVULET_SMART_TEST=1: time smart list matching on this lineup, then walk the menus a viewer
+        // sees, 6 s apart, for screenshots; the test lists are deleted at the end.
+        if ProcessInfo.processInfo.environment["RIVULET_SMART_TEST"] != nil, !Self.debugPlayed {
+            Self.debugPlayed = true
+            Task { @MainActor [weak self] in await self?.debugSmartListRun() }
+        }
         // RIVULET_LIST_PLAY=<name part>: play that channel from the List, as Select on its row does.
         if let name = ProcessInfo.processInfo.environment["RIVULET_LIST_PLAY"], !Self.debugPlayed {
             Self.debugPlayed = true
@@ -188,6 +194,63 @@ final class LiveListViewController: UIViewController {
         }
         #endif
     }
+
+    #if DEBUG
+    private func debugSmartListRun() async {
+        let data = LiveTVDataStore.shared
+        for _ in 0..<120 where data.channels.isEmpty || data.epg.isEmpty { try? await Task.sleep(for: .milliseconds(500)) }
+        try? await Task.sleep(for: .seconds(3))
+        let lineup = data.channels
+        func time<T>(_ label: String, _ work: () -> T) -> T {
+            let start = Date()
+            let result = work()
+            print("[Smart] \(label): \(Int(Date().timeIntervalSince(start) * 1000)) ms")
+            return result
+        }
+        print("[Smart] lineup \(lineup.count) channels, guide \(data.epg.count) channels")
+        let origins = time("origins") { LiveSmartRules.origins(in: lineup) }
+        print("[Smart] origins \(origins.count): \(origins.prefix(40).map { ContentOrigin.title(forOrigin: $0) })")
+        let genres = LiveGenre.allCases
+        for (label, rules) in [("NL", LiveSmartRules([.origin("NL")])),
+                               ("NL+Sports", LiveSmartRules([.origin("NL"), .genre(.sports)])),
+                               ("GB+BE News", LiveSmartRules([.origin("GB"), .origin("BE"), .genre(.news)])),
+                               ("Kids", LiveSmartRules([.genre(.kids)])),
+                               ("word bbc", LiveSmartRules([.word("bbc")]))] {
+            let found = time("match \(label)") { rules.channels(in: lineup, epg: data.epg) }
+            _ = time("again \(label)") { rules.channels(in: lineup, epg: data.epg) }
+            print("[Smart] \(label): \(found.count) e.g. \(found.prefix(6).map(\.name))")
+        }
+        let step: Duration = .seconds(6)
+        func dismissAll() { if presentedViewController != nil { dismiss(animated: false) } }
+        print("[Smart] step 1 kinds"); LiveSmartListMenu.newAction(from: self, sourceIdFilter: sourceIdFilter).handler()
+        try? await Task.sleep(for: step); dismissAll()
+        print("[Smart] step 2 countries")
+        LiveSmartListMenu.presentValues(origins.map { .origin($0) }, title: "Country or Language",
+                                        rules: LiveSmartRules(), from: self) { _ in }
+        try? await Task.sleep(for: step); dismissAll()
+        print("[Smart] step 3 genres")
+        LiveSmartListMenu.presentValues(genres.map { .genre($0) }, title: "Genre", rules: LiveSmartRules([.genre(.sports)]),
+                                        from: self) { _ in }
+        try? await Task.sleep(for: step); dismissAll()
+        let store = LiveChannelListStore.shared
+        let one = time("create + rebuild") { () -> LiveChannelList? in
+            let list = store.createSmartList(named: "🇳🇱 Netherlands", rules: LiveSmartRules([.origin("NL")]))
+            _ = data.liveCategoryList(sourceIdFilter: sourceIdFilter)
+            return list
+        }
+        let two = store.createSmartList(named: "Sport NL", rules: LiveSmartRules([.origin("NL"), .genre(.sports)]))
+        print("[Smart] step 4 column with lists")
+        try? await Task.sleep(for: step)
+        if let two {
+            print("[Smart] step 5 edit menu")
+            let sections = LiveSmartListMenu.editSections(listId: two.id, from: self, sourceIdFilter: sourceIdFilter)
+            present(TileMenuPopupViewController(sections: sections, header: TileMenuHeader(title: two.name)), animated: false)
+            try? await Task.sleep(for: step); dismissAll()
+        }
+        if let one, let two { store.delete(one.id); store.delete(two.id) }
+        print("[Smart] done")
+    }
+    #endif
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
@@ -652,8 +715,8 @@ final class LiveListViewController: UIViewController {
         )
     }
 
-    /// Held Select on a category: pin a group to the top, or rename or
-    /// delete one of the viewer's own lists.
+    /// Held Select on a category: pin a group to the top, rename or delete one
+    /// of the viewer's own lists, change a smart list's rules, or start a smart list.
     @objc private func handleCategoryLongPress(_ recognizer: UILongPressGestureRecognizer) {
         guard recognizer.state == .began,
               let indexPath = TileLongPress.focusedCell(in: categoryView),
@@ -669,6 +732,7 @@ final class LiveListViewController: UIViewController {
             }
         }
         if case .list(let listId) = category.kind {
+            sections += LiveSmartListMenu.editSections(listId: listId, from: self, sourceIdFilter: sourceIdFilter)
             sections.append([TileMenuAction(title: "Rename", systemImage: "pencil") { [weak self] in
                 guard let self else { return }
                 LiveProgramMenu.presentNameEntry(title: "Rename List", initialText: category.title, from: self) { name in
@@ -683,7 +747,7 @@ final class LiveListViewController: UIViewController {
                     onConfirm: { store.delete(listId) }), animated: true)
             }])
         }
-        guard !sections.isEmpty else { return }
+        sections.append([LiveSmartListMenu.newAction(from: self, sourceIdFilter: sourceIdFilter)])
         let frame = categoryView.cellForItem(at: indexPath).map { $0.convert($0.bounds, to: nil) }
         present(TileMenuPopupViewController(sections: sections, sourceFrame: frame,
                                             header: TileMenuHeader(title: category.title)), animated: false)
