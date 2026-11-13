@@ -14,6 +14,8 @@ enum MediaProviderKind: String, Sendable, Hashable, Codable, CaseIterable {
     case plex
     case jellyfin
     case emby
+    /// An Xtream Codes panel's films and series, beside its live channels in Live TV.
+    case xtream
 }
 
 enum ConnectionState: Sendable, Hashable {
@@ -59,6 +61,7 @@ extension MediaProviderKind {
         case .plex: "Plex"
         case .jellyfin: "Jellyfin"
         case .emby: "Emby"
+        case .xtream: "Xtream"
         }
     }
 }

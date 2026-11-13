@@ -19,8 +19,9 @@ final class EmbyKindTests: XCTestCase {
         let data = try JSONEncoder().encode([MediaProviderKind.emby])
         XCTAssertEqual(String(decoding: data, as: UTF8.self), #"["emby"]"#)
         XCTAssertEqual(try JSONDecoder().decode([MediaProviderKind].self, from: data), [.emby])
-        XCTAssertEqual(MediaProviderKind.otherServerKinds, [.jellyfin, .emby])
-        XCTAssertEqual(OtherServerKind.all.map(\.kind), MediaProviderKind.otherServerKinds)
+        XCTAssertEqual(MediaProviderKind.otherServerKinds, [.jellyfin, .emby, .xtream])
+        // Xtream has no sign-in of its own: its films and series follow its Live TV source.
+        XCTAssertEqual(OtherServerKind.all.map(\.kind), [.jellyfin, .emby])
     }
 
     func test_liveTVSourceType_embyFollowsItsServer() throws {

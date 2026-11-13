@@ -1491,6 +1491,12 @@ enum SettingsContent {
             SettingsRowItem(id: "src_channels", title: "Channels",
                             kind: .info(value: { "\(source.channelCount)" }))
         ]
+        // An Xtream panel's films and series, as Movies and TV Shows libraries.
+        if source.sourceType == .xtream {
+            rows.append(SettingsRowItem(id: "src_xtreamVOD", title: "Movies and TV Shows", kind: .toggle(
+                get: { XtreamVODSources.isEnabled(source.id) },
+                set: { XtreamVODSources.setEnabled($0, for: source.id) })))
+        }
         // Only shown when a profile is actually set, so the common all-channels
         // source keeps the page as short as it is today.
         if let profile = source.channelProfile {

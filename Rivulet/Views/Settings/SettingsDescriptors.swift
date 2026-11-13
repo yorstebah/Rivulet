@@ -345,6 +345,10 @@ enum SettingsDescriptorStore {
             icon: "tv.and.mediabox",
             description: "Off hides this server's channels from Live TV. Its libraries stay."
         ),
+        "src_xtreamVOD": SettingDescriptor(
+            icon: "film.stack",
+            description: "The provider's films and series, as Movies and TV Shows libraries in the sidebar and on Home. Off leaves only its channels."
+        ),
         "src_showInLiveTV": SettingDescriptor(
             icon: "tv.and.mediabox",
             description: "Off hides this server's channels from Live TV. Its libraries stay."

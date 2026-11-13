@@ -4651,6 +4651,8 @@
         }
       }
     },
+    "Movies and TV Shows" : {},
+    "TV Shows" : {},
     "The Guide lists every channel against the time. What's On shows rows of what is on now, with multiview, like the Apple TV app." : {
       "localizations" : {
         "de" : {
@@ -14587,6 +14589,7 @@
       }
     },
     "The Guide lists every channel against the time. What's On shows rows of what is on now, with multiview, like the Apple TV app. List shows your categories beside their channels and what is on each." : {},
+    "The provider's films and series, as Movies and TV Shows libraries in the sidebar and on Home. Off leaves only its channels." : {},
     "Your Plex server's tuners. Select to see details or remove it." : {
       "localizations" : {
         "de" : {

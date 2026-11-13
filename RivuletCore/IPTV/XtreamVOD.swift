@@ -16,13 +16,13 @@
 
 import Foundation
 
-struct XtreamVODCategory: Sendable, Equatable {
+nonisolated struct XtreamVODCategory: Sendable, Equatable, Codable {
     let id: String
     let name: String
 }
 
 /// A film as `get_vod_streams` lists it.
-struct XtreamMovie: Sendable, Equatable {
+nonisolated struct XtreamMovie: Sendable, Equatable, Codable {
     let id: String
     let name: String
     let categoryId: String?
@@ -36,7 +36,7 @@ struct XtreamMovie: Sendable, Equatable {
 }
 
 /// A film's details from `get_vod_info`.
-struct XtreamMovieInfo: Sendable, Equatable {
+nonisolated struct XtreamMovieInfo: Sendable, Equatable {
     let plot: String?
     let genre: String?
     let cast: String?
@@ -50,7 +50,7 @@ struct XtreamMovieInfo: Sendable, Equatable {
 }
 
 /// A series as `get_series` lists it.
-struct XtreamSeries: Sendable, Equatable {
+nonisolated struct XtreamSeries: Sendable, Equatable, Codable {
     let id: String
     let name: String
     let categoryId: String?
@@ -63,13 +63,13 @@ struct XtreamSeries: Sendable, Equatable {
     let updatedAt: Date?
 }
 
-struct XtreamSeason: Sendable, Equatable {
+nonisolated struct XtreamSeason: Sendable, Equatable {
     let number: Int
     let name: String?
     let coverURL: URL?
 }
 
-struct XtreamEpisode: Sendable, Equatable {
+nonisolated struct XtreamEpisode: Sendable, Equatable {
     let id: String
     let season: Int
     let number: Int
@@ -82,7 +82,7 @@ struct XtreamEpisode: Sendable, Equatable {
 }
 
 /// A series' seasons and episodes from `get_series_info`, episodes in season then episode order.
-struct XtreamSeriesInfo: Sendable, Equatable {
+nonisolated struct XtreamSeriesInfo: Sendable, Equatable {
     let seasons: [XtreamSeason]
     let episodes: [XtreamEpisode]
 }

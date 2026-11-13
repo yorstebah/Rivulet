@@ -74,10 +74,19 @@ final class XtreamWatchProgressStore: ObservableObject {
     /// Titles with a resume point, last watched first: the Continue Watching row.
     func inProgress(limit: Int = 30) -> [String] {
         records
-            .filter { WatchProgressPolicy.hasResumePoint(offsetSeconds: $0.value.position, runtimeSeconds: $0.value.duration) }
+            .filter { Self.hasResumePoint($0.value) }
             .sorted { $0.value.updatedAt > $1.value.updatedAt }
             .prefix(limit)
             .map(\.key)
+    }
+
+    /// By `WatchProgressPolicy` when the length is known. Panels often leave it out, and the
+    /// policy then answers no, so an unwatched title a minute or more in counts instead.
+    static func hasResumePoint(_ record: XtreamWatchRecord) -> Bool {
+        if let duration = record.duration, duration > 0 {
+            return WatchProgressPolicy.hasResumePoint(offsetSeconds: record.position, runtimeSeconds: duration)
+        }
+        return !record.watched && record.position >= 60
     }
 
     private func save() {

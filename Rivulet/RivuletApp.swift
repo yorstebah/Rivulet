@@ -66,6 +66,7 @@ struct RivuletApp: App {
         }
         JellyfinSession.onChanged = { ServerDataStore.shared.reload() }
         EmbySession.onChanged = { ServerDataStore.shared.reload() }
+        XtreamVODWiring.install()
         OtherServerKind.installLiveSessionClosers()
         PlexUserProfileManager.onProfileChanged = {
             // The queue reports progress with whichever token is current.

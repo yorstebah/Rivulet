@@ -16,6 +16,10 @@ final class MediaProviderRegistry {
     /// turns it off at launch, before the first `populate`.
     static var plexIncludesCollections = true
 
+    /// Whether each Xtream Live TV source also registers its films and series
+    /// (`XtreamVODProvider`). tvOS turns it on at launch; the other apps do not offer them yet.
+    static var includesXtreamVOD = false
+
     /// Told the other servers after each populate. tvOS loads their library settings here.
     @ObservationIgnored var onSecondaryProvidersChanged: (([any MediaProvider]) -> Void)?
 
@@ -122,14 +126,16 @@ final class MediaProviderRegistry {
             extraPlex: extras.current.compactMap { server in
                 extras.token(for: server).map { (server, $0) }
             },
-            plexOwnerID: String(auth.contentOwnerID)
+            plexOwnerID: String(auth.contentOwnerID),
+            xtreamVOD: Self.includesXtreamVOD ? XtreamVODSources.providers() : []
         )
     }
 
     /// `populateFromCurrentAuth` with the Plex sign-in passed in, so the
     /// registry's rules are testable without a real Plex account.
     func populate(plexServerURL: String?, plexToken: String?, plexMachineID: String?, plexName: String,
-                  extraPlex: [(server: PlexExtraServers.Server, token: String)] = [], plexOwnerID: String? = nil) {
+                  extraPlex: [(server: PlexExtraServers.Server, token: String)] = [], plexOwnerID: String? = nil,
+                  xtreamVOD: [any MediaProvider] = []) {
         // Other servers' library settings belong to their own users (an extra
         // Plex server's to the profile), so they load with the sign-in.
         defer { onSecondaryProvidersChanged?(secondaryProviders) }
@@ -138,6 +144,7 @@ final class MediaProviderRegistry {
         for other in OtherServerKind.all {
             if let stored = other.storedProvider() { register(stored) }
         }
+        xtreamVOD.forEach(register)
         guard let serverURL = plexServerURL, let token = plexToken else {
             providers = providers.filter { $0.value.kind != .plex }
             currentPlexID = nil

@@ -410,6 +410,15 @@ class LiveTVDataStore: ObservableObject {
         return "tvheadend:" + SHA256.hash(data: Data(key.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// The Xtream sources in use, by id: their name and login. A restricted
+    /// profile's withheld sources are left out. Films and series are offered for these.
+    var xtreamSources: [(id: String, name: String, account: XtreamAccount)] {
+        providers.compactMap { id, provider -> (id: String, name: String, account: XtreamAccount)? in
+            guard let iptv = provider as? IPTVProvider, let account = iptv.xtreamAccount else { return nil }
+            return (id, iptv.displayName, account)
+        }.sorted { $0.id < $1.id }
+    }
+
     /// From a hash of the server and username, so neither ends up in channel ids.
     static func xtreamSourceId(for account: XtreamAccount) -> String {
         let key = account.server.absoluteString.lowercased() + "\n" + account.username
@@ -449,6 +458,7 @@ class LiveTVDataStore: ObservableObject {
         KeychainHelper.delete(Self.apiTokenKey(sourceId: id))
         KeychainHelper.delete(Self.playlistURLKey(sourceId: id))
         KeychainHelper.delete(Self.guideURLKey(sourceId: id))
+        XtreamVODCatalog.forget(sourceID: id)
         dropSources([id])
         saveSources()
         await updateSourceInfo()

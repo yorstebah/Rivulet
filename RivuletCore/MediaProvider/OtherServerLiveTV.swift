@@ -7,7 +7,9 @@ extension OtherServerKind {
     /// The extra Plex servers, and each other kind's server only while it is that kind's signed-in account
     /// (`accountIDs`, empty for a restricted profile); a registry entry left over from a sign-out is dropped.
     static func shown(_ providers: [any MediaProvider], accountIDs: [MediaProviderKind: String]) -> [any MediaProvider] {
-        providers.filter { $0.kind == .plex || accountIDs[$0.kind] == $0.id }
+        // Xtream films and series follow their Live TV sources, which a
+        // restricted profile does not get: the store withholds them.
+        providers.filter { $0.kind == .plex || $0.kind == .xtream || accountIDs[$0.kind] == $0.id }
     }
 
     /// Live streams from a Jellyfin or Emby server need their teardown: the closers release a stream
