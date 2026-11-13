@@ -87,6 +87,9 @@ private struct IOSLiveSourceDetailView: View {
                         LabeledContent("Channel Profile", value: profile)
                     }
                 }
+                if source.sourceType == .xtream {
+                    IOSXtreamVODSection(sourceId: source.id)
+                }
                 Section {
                     Button {
                         isRefreshing = true
@@ -131,6 +134,36 @@ private struct IOSLiveSourceDetailView: View {
 }
 
 /// Rivulet's favourites in order: drag to reorder, swipe to remove.
+/// An Xtream source's films and series: the switch, and the TMDB key their detail pages use.
+private struct IOSXtreamVODSection: View {
+    let sourceId: String
+    @State private var enabled = true
+    @State private var tmdbKey = ""
+
+    var body: some View {
+        Section {
+            Toggle("Movies and TV Shows", isOn: $enabled)
+                .onChange(of: enabled) { _, on in XtreamVODSources.setEnabled(on, for: sourceId) }
+            SecureField("TMDB API Key", text: $tmdbKey)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onSubmit(saveKey)
+        } footer: {
+            Text("The provider's films and series appear as Movies and TV Shows libraries. With your own free key from themoviedb.org, their pages show the plot in your language, the cast with photos and more.")
+        }
+        .onAppear {
+            enabled = XtreamVODSources.isEnabled(sourceId)
+            tmdbKey = KeychainHelper.get(TMDBLookup.keychainKey) ?? ""
+        }
+        .onDisappear(perform: saveKey)
+    }
+
+    private func saveKey() {
+        let trimmed = tmdbKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { _ = KeychainHelper.delete(TMDBLookup.keychainKey) } else { _ = KeychainHelper.set(trimmed, forKey: TMDBLookup.keychainKey) }
+    }
+}
+
 private struct IOSLiveFavoritesView: View {
     @ObservedObject private var store = LiveTVDataStore.shared
 

@@ -26,6 +26,8 @@ struct RivuletMacApp: App {
         PlexAPI.deviceName = "Mac"
         // The Mac library grid lists titles, as on iOS.
         MediaProviderRegistry.plexIncludesCollections = false
+        // Xtream Live TV sources also offer their films and series as servers.
+        XtreamVODWiring.install()
         MediaProviderRegistry.shared.populateFromCurrentAuth()
         let session = PlexSession()
         session.installProfileHooks()

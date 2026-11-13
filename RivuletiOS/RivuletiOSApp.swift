@@ -35,6 +35,8 @@ struct RivuletiOSApp: App {
         PlexAPI.deviceName = isMac ? "Mac" : UIDevice.current.model   // "iPhone" / "iPad"
         // The iOS library grid lists titles; tvOS also lists a library's collections.
         MediaProviderRegistry.plexIncludesCollections = false
+        // Xtream Live TV sources also offer their films and series as servers.
+        XtreamVODWiring.install()
         // The signed-in Jellyfin and Emby servers, rebuilt from their stored accounts.
         MediaProviderRegistry.shared.populateFromCurrentAuth()
         let session = PlexSession()

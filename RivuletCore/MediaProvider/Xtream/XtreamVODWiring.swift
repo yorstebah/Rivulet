@@ -5,9 +5,10 @@
 //  XtreamVODWiring.swift
 //  Rivulet
 //
-//  Xtream films and series on tvOS: switched on at launch, and the servers
+//  Xtream films and series in an app: switched on at launch, and the servers
 //  rebuilt whenever an Xtream source is added, renamed or removed, or its
-//  films and series are switched on or off.
+//  films and series are switched on or off. Every app calls `install` from its
+//  launch, before the registry first populates.
 //
 
 import Combine
@@ -16,13 +17,16 @@ import Foundation
 @MainActor
 enum XtreamVODWiring {
     private static var sourceWatch: AnyCancellable?
+    private static var afterChange: (() -> Void)?
 
-    /// From the app's init, before the registries first populate.
-    static func install() {
+    /// `afterChange` runs once the registry is rebuilt (tvOS reloads its server store; the
+    /// iOS and Mac stores follow the registry by themselves).
+    static func install(afterChange: (() -> Void)? = nil) {
         // Not in the unit-test host: tests own the registry, and the device's
         // sources would download their whole lists in the background of the run.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         MediaProviderRegistry.includesXtreamVOD = true
+        Self.afterChange = afterChange
         XtreamVODSources.onChanged = refresh
         sourceWatch = LiveTVDataStore.shared.$sources
             .map { sources in sources.filter { $0.sourceType == .xtream }.map { "\($0.id)\n\($0.displayName)" } }
@@ -34,6 +38,6 @@ enum XtreamVODWiring {
 
     private static func refresh() {
         MediaProviderRegistry.shared.populateFromCurrentAuth()
-        ServerDataStore.shared.reload()
+        afterChange?()
     }
 }
