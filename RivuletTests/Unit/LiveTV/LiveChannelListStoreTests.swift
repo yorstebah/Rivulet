@@ -60,4 +60,10 @@ final class LiveChannelListStoreTests: XCTestCase {
         XCTAssertEqual(LiveChannelListStore(defaults: defaults).pinnedCategoryKeys, ["x|News", "x|Kids"])
         XCTAssertTrue(store.isPinned("x|News"))
     }
+
+    func test_tabTitle_setsAClashingListApart() {
+        let list = LiveChannelList(id: "L1", name: "Sport", channelIds: [])
+        XCTAssertEqual(list.tabTitle(taken: ["News"]), "Sport")
+        XCTAssertEqual(list.tabTitle(taken: ["Sport", "News"]), "Sport (List)")
+    }
 }

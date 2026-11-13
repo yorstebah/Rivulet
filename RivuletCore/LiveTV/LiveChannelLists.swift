@@ -19,6 +19,12 @@ struct LiveChannelList: Codable, Hashable, Identifiable {
     let id: String
     var name: String
     var channelIds: [String]
+
+    /// The list's tab in the guide, whose tabs go by title: its name, or "Name (List)"
+    /// when a channel group, a source or Favorites already has that name.
+    func tabTitle(taken: Set<String>) -> String {
+        taken.contains(name) ? String(localized: "\(name) (List)") : name
+    }
 }
 
 @MainActor

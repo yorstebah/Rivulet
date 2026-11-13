@@ -79,8 +79,20 @@ struct GuideLayoutView: View {
             sourceNames: dataStore.sources.map(\.displayName).filter { sourceTabs[$0] != nil },
             // Offered only when there are favourites, so no empty tab.
             hasFavorites: !dataStore.favorites(in: sourceChannels).isEmpty,
-            lists: ownLists.map(\.name),
+            lists: ownLists.map { $0.tabTitle(taken: takenTabNames) },
             pinnedGroups: pinnedGroupTitles)
+    }
+
+    private var takenTabNames: Set<String> { Self.takenTabNames(sourceIdFilter: sourceIdFilter, store: dataStore) }
+
+    /// Tab titles a list must not reuse: the groups, the sources and Favorites. The List
+    /// layout asks this too, so both name a list's tab the same way.
+    static func takenTabNames(sourceIdFilter: String?, store: LiveTVDataStore) -> Set<String> {
+        let channels = sourceIdFilter.map { id in store.channels.filter { $0.sourceId == id } } ?? store.channels
+        var taken = Set(channels.compactMap { LiveGroupOrder.trimmed($0.groupTitle) })
+        taken.formUnion(store.sources.map(\.displayName))
+        taken.insert(favouritesTab)
+        return taken
     }
 
     /// The viewer's own lists with a channel here, each a tab after Favorites.
@@ -133,7 +145,8 @@ struct GuideLayoutView: View {
             return dataStore.favorites(in: sourceChannels)
         }
         // One of the viewer's own lists: its channels, in its order.
-        if let list = ownLists.first(where: { $0.name == group }) {
+        let taken = takenTabNames
+        if let list = ownLists.first(where: { $0.tabTitle(taken: taken) == group }) {
             let byId = Dictionary(sourceChannels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             return list.channelIds.compactMap { byId[$0] }
         }

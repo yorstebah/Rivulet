@@ -23,6 +23,7 @@
         }
       }
     },
+    "%@ (List)" : {},
     "%@ + %lld more" : {
       "localizations" : {
         "de" : {
