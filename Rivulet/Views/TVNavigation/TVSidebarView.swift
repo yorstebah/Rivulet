@@ -220,6 +220,8 @@ struct TVSidebarView: View {
             }
         }
         .onChange(of: serverStore.visibleLibraries) { _, libraries in
+            // DEBUG launch hooks also reach other servers' libraries, and Search without Plex.
+            applyDebugLaunchTab()
             if case .providerLibrary(let providerID, let libraryID) = selectedTab,
                !libraries.contains(where: { $0.providerID == providerID && $0.id == libraryID }) {
                 selectedTab = .home
@@ -755,6 +757,14 @@ struct TVSidebarView: View {
             didApplyDebugLaunch = true
             selectedTab = .liveTV(sourceId: nil)
             Task { await LiveMultiviewViewController.debugOpenIfRequested() }
+            return
+        }
+        #endif
+        #if DEBUG
+        // Another server's library by title (Jellyfin, Emby, an Xtream source's Movies).
+        if let other = serverStore.visibleLibraries.first(where: { $0.title == name }) {
+            didApplyDebugLaunch = true
+            selectedTab = .providerLibrary(providerID: other.providerID, libraryID: other.id)
             return
         }
         #endif
