@@ -5,9 +5,10 @@
 //  XtreamWatchProgress.swift
 //  Rivulet
 //
-//  Where the viewer is in Xtream films and episodes. An Xtream panel keeps no
-//  watch state, so Rivulet keeps it on this device: a position and a watched
-//  flag per title, judged by `WatchProgressPolicy` like every other server's.
+//  Where the viewer is in Xtream films and episodes, and which films and
+//  series are favorites. An Xtream panel keeps no user state, so Rivulet
+//  keeps it on this device: a position and a watched flag per title, judged
+//  by `WatchProgressPolicy` like every other server's.
 //
 
 import Foundation
@@ -27,9 +28,12 @@ final class XtreamWatchProgressStore: ObservableObject {
 
     /// Keyed by `key(source:kind:id:)`.
     @Published private(set) var records: [String: XtreamWatchRecord] = [:]
+    /// Favorite films and series by key, in the order they were added.
+    @Published private(set) var favorites: [String] = []
 
     private let defaults: UserDefaults
     static let defaultsKey = "xtreamWatchProgress"
+    static let favoritesKey = "xtreamFavorites"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -37,9 +41,18 @@ final class XtreamWatchProgressStore: ObservableObject {
            let saved = try? JSONDecoder().decode([String: XtreamWatchRecord].self, from: data) {
             records = saved
         }
+        favorites = defaults.stringArray(forKey: Self.favoritesKey) ?? []
     }
 
-    enum Kind: String, Sendable { case movie, episode }
+    enum Kind: String, Sendable { case movie, episode, series }
+
+    func isFavorite(_ key: String) -> Bool { favorites.contains(key) }
+
+    func setFavorite(_ favorite: Bool, key: String) {
+        guard favorite != isFavorite(key) else { return }
+        if favorite { favorites.append(key) } else { favorites.removeAll { $0 == key } }
+        defaults.set(favorites, forKey: Self.favoritesKey)
+    }
 
     /// A title on one source: ids are only unique within a panel.
     nonisolated static func key(source: String, kind: Kind, id: String) -> String {

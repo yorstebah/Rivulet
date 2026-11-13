@@ -64,13 +64,21 @@ nonisolated enum XtreamVODLibrary: String, Sendable, CaseIterable {
 }
 
 nonisolated enum XtreamVODMapping {
-    /// The watch state a list is mapped with: each title's record, by `XtreamWatchProgressStore` key.
-    typealias Records = [String: XtreamWatchRecord]
+    /// The device's state a list is mapped with: each title's record and the favorites,
+    /// by `XtreamWatchProgressStore` key.
+    struct State: Sendable {
+        var records: [String: XtreamWatchRecord] = [:]
+        var favorites: Set<String> = []
+    }
 
     // MARK: Watch-state keys
 
     static func movieKey(source: String, movieID: String) -> String {
         XtreamWatchProgressStore.key(source: source, kind: .movie, id: movieID)
+    }
+
+    static func seriesKey(source: String, seriesID: String) -> String {
+        XtreamWatchProgressStore.key(source: source, kind: .series, id: seriesID)
     }
 
     /// An episode's id is unique on the panel, but its series is what Continue Watching needs.
@@ -98,32 +106,33 @@ nonisolated enum XtreamVODMapping {
         }
     }
 
-    static func userState(_ record: XtreamWatchRecord?) -> MediaUserState {
+    static func userState(_ record: XtreamWatchRecord?, favorite: Bool = false) -> MediaUserState {
         MediaUserState(isPlayed: record?.watched ?? false, viewOffset: record?.position ?? 0,
-                       isFavorite: false, lastViewedAt: record?.updatedAt)
+                       isFavorite: favorite, lastViewedAt: record?.updatedAt)
     }
 
     // MARK: Items
 
-    static func item(_ movie: XtreamMovie, provider: String, records: Records) -> MediaItem {
-        MediaItem(
+    static func item(_ movie: XtreamMovie, provider: String, state: State) -> MediaItem {
+        let key = movieKey(source: provider, movieID: movie.id)
+        return MediaItem(
             ref: MediaItemRef(providerID: provider, itemID: XtreamVODID.movie(movie.id).itemID),
             kind: .movie, title: movie.name, sortTitle: nil, overview: nil, year: movie.year,
             runtime: nil,
             parentRef: nil, grandparentRef: nil, episodeNumber: nil, seasonNumber: nil, childProgress: nil,
-            userState: userState(records[movieKey(source: provider, movieID: movie.id)]),
+            userState: userState(state.records[key], favorite: state.favorites.contains(key)),
             artwork: MediaArtwork(poster: movie.posterURL, backdrop: nil, thumbnail: movie.posterURL, logo: nil),
             parentArtwork: nil, grandparentArtwork: nil,
             libraryID: XtreamVODLibrary.movies.rawValue)
     }
 
-    static func item(_ series: XtreamSeries, provider: String) -> MediaItem {
+    static func item(_ series: XtreamSeries, provider: String, state: State = State()) -> MediaItem {
         MediaItem(
             ref: MediaItemRef(providerID: provider, itemID: XtreamVODID.series(series.id).itemID),
             kind: .show, title: series.name, sortTitle: nil, overview: series.plot, year: series.year,
             runtime: nil,
             parentRef: nil, grandparentRef: nil, episodeNumber: nil, seasonNumber: nil, childProgress: nil,
-            userState: userState(nil),
+            userState: userState(nil, favorite: state.favorites.contains(seriesKey(source: provider, seriesID: series.id))),
             artwork: MediaArtwork(poster: series.coverURL, backdrop: series.backdropURL,
                                   thumbnail: series.coverURL, logo: nil),
             parentArtwork: nil, grandparentArtwork: nil,
@@ -150,7 +159,7 @@ nonisolated enum XtreamVODMapping {
     }
 
     static func item(_ episode: XtreamEpisode, of series: XtreamSeries, provider: String,
-                     records: Records) -> MediaItem {
+                     state: State) -> MediaItem {
         let showRef = MediaItemRef(providerID: provider, itemID: XtreamVODID.series(series.id).itemID)
         let seasonRef = MediaItemRef(providerID: provider,
                                      itemID: XtreamVODID.season(seriesID: series.id, number: episode.season).itemID)
@@ -164,7 +173,7 @@ nonisolated enum XtreamVODMapping {
             runtime: episode.duration,
             parentRef: seasonRef, grandparentRef: showRef, seriesTitle: series.name,
             episodeNumber: episode.number, seasonNumber: episode.season, childProgress: nil,
-            userState: userState(records[episodeKey(source: provider, seriesID: series.id, episodeID: episode.id)]),
+            userState: userState(state.records[episodeKey(source: provider, seriesID: series.id, episodeID: episode.id)]),
             artwork: MediaArtwork(poster: series.coverURL, backdrop: series.backdropURL,
                                   thumbnail: episode.imageURL ?? series.backdropURL ?? series.coverURL, logo: nil),
             parentArtwork: seriesArt, grandparentArtwork: seriesArt,

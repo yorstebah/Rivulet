@@ -45,8 +45,11 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
 
     // MARK: - Watch state
 
-    private func records() async -> XtreamVODMapping.Records {
-        await MainActor.run { watchStore().records }
+    private func state() async -> XtreamVODMapping.State {
+        await MainActor.run {
+            let store = watchStore()
+            return XtreamVODMapping.State(records: store.records, favorites: Set(store.favorites))
+        }
     }
 
     private func key(for ref: MediaItemRef) -> String? {
@@ -108,17 +111,17 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     }
 
     func items(in library: MediaLibrary, sort: SortOption, page: Page) async throws -> PagedResult<MediaItem> {
+        let state = await state()
         let result: (items: [MediaItem], total: Int)
         switch XtreamVODLibrary(rawValue: library.id) {
         case .movies:
-            let records = await records()
             let page = XtreamVODMapping.page(try await catalog.movieLists().titles, sortable: XtreamVODMapping.sortable,
                                              sort: sort, page: page)
-            result = (page.items.map { XtreamVODMapping.item($0, provider: id, records: records) }, page.total)
+            result = (page.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
         case .series:
             let page = XtreamVODMapping.page(try await catalog.seriesLists().titles, sortable: XtreamVODMapping.sortable,
                                              sort: sort, page: page)
-            result = (page.items.map { XtreamVODMapping.item($0, provider: id) }, page.total)
+            result = (page.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
         case nil:
             throw MediaProviderError.notFound
         }
@@ -163,14 +166,14 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     }
 
     func children(of itemRef: MediaItemRef) async throws -> [MediaItem] {
+        let state = await state()
         switch XtreamVODID(itemID: itemRef.itemID) {
         case .category(.movies, let category):
-            let records = await records()
             return try await catalog.movieLists().titles.filter { $0.categoryId == category }
-                .map { XtreamVODMapping.item($0, provider: id, records: records) }
+                .map { XtreamVODMapping.item($0, provider: id, state: state) }
         case .category(.series, let category):
             return try await catalog.seriesLists().titles.filter { $0.categoryId == category }
-                .map { XtreamVODMapping.item($0, provider: id) }
+                .map { XtreamVODMapping.item($0, provider: id, state: state) }
         case .series(let seriesID):
             let (series, info) = try await seriesAndInfo(seriesID)
             return info.seasons.map { XtreamVODMapping.item($0, of: series, provider: id) }
@@ -201,42 +204,42 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
 
     private func episodes(of seriesID: String) async throws -> [MediaItem] {
         let (series, info) = try await seriesAndInfo(seriesID)
-        let records = await records()
+        let state = await state()
         for episode in info.episodes {
             if let duration = episode.duration {
                 let itemID = XtreamVODID.episode(seriesID: seriesID, episodeID: episode.id).itemID
                 runtimes.withLock { $0[itemID] = duration }
             }
         }
-        return info.episodes.map { XtreamVODMapping.item($0, of: series, provider: id, records: records) }
+        return info.episodes.map { XtreamVODMapping.item($0, of: series, provider: id, state: state) }
     }
 
     // MARK: - Search
 
     func search(_ query: String) async throws -> [MediaItem] {
         async let shows = catalog.seriesLists()
-        let records = await records()
+        let state = await state()
         let movies = XtreamVODMapping.search(query, in: try await catalog.movieLists().titles, name: \.name, limit: 50)
-            .map { XtreamVODMapping.item($0, provider: id, records: records) }
+            .map { XtreamVODMapping.item($0, provider: id, state: state) }
         let series = XtreamVODMapping.search(query, in: (try? await shows)?.titles ?? [], name: \.name, limit: 50)
-            .map { XtreamVODMapping.item($0, provider: id) }
+            .map { XtreamVODMapping.item($0, provider: id, state: state) }
         return movies + series
     }
 
     /// Other titles in the same panel category.
     func related(for ref: MediaItemRef, kind: MediaKind) async throws -> RelatedContent {
+        let state = await state()
         switch XtreamVODID(itemID: ref.itemID) {
         case .movie(let movieID):
             let titles = try await catalog.movieLists().titles
             guard let category = titles.first(where: { $0.id == movieID })?.categoryId else { break }
-            let records = await records()
             return RelatedContent(items: titles.filter { $0.categoryId == category && $0.id != movieID }.prefix(20)
-                .map { XtreamVODMapping.item($0, provider: id, records: records) }, collection: nil)
+                .map { XtreamVODMapping.item($0, provider: id, state: state) }, collection: nil)
         case .series(let seriesID):
             let titles = try await catalog.seriesLists().titles
             guard let category = titles.first(where: { $0.id == seriesID })?.categoryId else { break }
             return RelatedContent(items: titles.filter { $0.categoryId == category && $0.id != seriesID }.prefix(20)
-                .map { XtreamVODMapping.item($0, provider: id) }, collection: nil)
+                .map { XtreamVODMapping.item($0, provider: id, state: state) }, collection: nil)
         default:
             break
         }
@@ -246,13 +249,14 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     // MARK: - Detail
 
     func fullDetail(for itemRef: MediaItemRef) async throws -> MediaItemDetail {
+        let state = await state()
         switch XtreamVODID(itemID: itemRef.itemID) {
         case .movie(let movieID):
             return try await movieDetail(movieID)
         case .series(let seriesID):
             let (series, _) = try await seriesAndInfo(seriesID)
             let episodes = try await episodes(of: seriesID)
-            return Self.detail(XtreamVODMapping.item(series, provider: id), genres: XtreamVODMapping.genres(series.genre),
+            return Self.detail(XtreamVODMapping.item(series, provider: id, state: state), genres: XtreamVODMapping.genres(series.genre),
                                nextEpisode: XtreamVODMapping.nextEpisode(episodes))
         case .season(let seriesID, let number):
             let (series, info) = try await seriesAndInfo(seriesID)
@@ -279,8 +283,8 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         guard let movie = try await catalog.movieLists().titles.first(where: { $0.id == movieID }) else {
             throw MediaProviderError.notFound
         }
-        let records = await records()
-        let listed = XtreamVODMapping.item(movie, provider: id, records: records)
+        let state = await state()
+        let listed = XtreamVODMapping.item(movie, provider: id, state: state)
         // Details are a bonus: a panel that fails `get_vod_info` still plays the film.
         guard let info = try? await info else {
             return Self.detail(listed, sources: [Self.source(runtime: nil, container: movie.containerExtension, url: nil)])
@@ -368,13 +372,13 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let keys = await MainActor.run { watchStore().inProgress(limit: limit) }
         let ids = keys.compactMap { XtreamVODMapping.id(fromKey: $0, source: id) }
         guard !ids.isEmpty else { return [] }
-        let records = await records()
+        let state = await state()
         var items: [MediaItem] = []
         for itemID in ids {
             switch itemID {
             case .movie(let movieID):
                 if let movie = try? await catalog.movieLists().titles.first(where: { $0.id == movieID }) {
-                    items.append(XtreamVODMapping.item(movie, provider: id, records: records))
+                    items.append(XtreamVODMapping.item(movie, provider: id, state: state))
                 }
             case .episode(let seriesID, _):
                 let ref = MediaItemRef(providerID: id, itemID: itemID.itemID)
@@ -394,8 +398,23 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
 
     func hubs() async throws -> [MediaHub] { [] }
 
+    /// The library page's rows: what is in progress there, the favorites, then Recently Added.
+    /// The first two are the device's own state, so a failure costs only them.
     func hubs(in library: MediaLibrary) async throws -> [MediaHub] {
-        try await recentlyAddedHub(in: library).map { [$0] } ?? []
+        var hubs: [MediaHub] = []
+        let kind: MediaKind = library.id == XtreamVODLibrary.movies.rawValue ? .movie : .episode
+        let continuing = ((try? await continueWatching(limit: 24)) ?? []).filter { $0.kind == kind }
+        if !continuing.isEmpty {
+            hubs.append(MediaHub(id: "\(library.id).continueWatching", providerID: id,
+                                 title: String(localized: "Continue Watching"), style: .shelf, items: continuing))
+        }
+        let favorites = (try? await favorites(in: library, limit: 50)) ?? []
+        if !favorites.isEmpty {
+            hubs.append(MediaHub(id: "\(library.id).favorites", providerID: id,
+                                 title: String(localized: "Favorites"), style: .shelf, items: favorites))
+        }
+        if let added = try await recentlyAddedHub(in: library) { hubs.append(added) }
+        return hubs
     }
 
     func recentlyAddedHub(in library: MediaLibrary) async throws -> MediaHub? {
@@ -412,6 +431,41 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
             return PagedResult(items: page.offset == 0 ? hub.items : [], total: hub.items.count, nextPage: nil)
         }
         return try await items(in: self.library(library), sort: .addedAtDesc, page: page)
+    }
+
+    // MARK: - Favorites
+
+    /// Kept on the device, as the panel keeps none.
+    var supportsFavorites: Bool { true }
+
+    /// The library's favorites by title, as the other servers' rows list them.
+    func favorites(in library: MediaLibrary, limit: Int) async throws -> [MediaItem] {
+        let state = await state()
+        guard !state.favorites.isEmpty else { return [] }
+        let items: [MediaItem]
+        switch XtreamVODLibrary(rawValue: library.id) {
+        case .movies:
+            items = try await catalog.movieLists().titles
+                .filter { state.favorites.contains(XtreamVODMapping.movieKey(source: id, movieID: $0.id)) }
+                .map { XtreamVODMapping.item($0, provider: id, state: state) }
+        case .series:
+            items = try await catalog.seriesLists().titles
+                .filter { state.favorites.contains(XtreamVODMapping.seriesKey(source: id, seriesID: $0.id)) }
+                .map { XtreamVODMapping.item($0, provider: id, state: state) }
+        case nil:
+            items = []
+        }
+        return Array(FavoritesOrder.byTitle(items).prefix(limit))
+    }
+
+    func setFavorite(_ favorite: Bool, for ref: MediaItemRef) async throws {
+        let key: String
+        switch XtreamVODID(itemID: ref.itemID) {
+        case .movie(let movieID): key = XtreamVODMapping.movieKey(source: id, movieID: movieID)
+        case .series(let seriesID): key = XtreamVODMapping.seriesKey(source: id, seriesID: seriesID)
+        default: throw MediaProviderError.backendSpecific(underlying: "only films and series are favorites")
+        }
+        await MainActor.run { watchStore().setFavorite(favorite, key: key) }
     }
 
     // MARK: - Watchlist

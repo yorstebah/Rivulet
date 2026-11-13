@@ -152,7 +152,7 @@ final class XtreamVODProviderTests: XCTestCase {
                               addedAt: nil, containerExtension: "mkv"),
                 of: XtreamSeries(id: "70", name: "S", categoryId: nil, coverURL: nil, backdropURL: nil, plot: nil,
                                  genre: nil, rating: nil, year: nil, updatedAt: nil),
-                provider: source, records: [:])
+                provider: source, state: .init())
             item.userState = MediaUserState(isPlayed: played, viewOffset: offset, isFavorite: false, lastViewedAt: nil)
             return item
         }
@@ -261,6 +261,32 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertTrue(episodes.allSatisfy(\.userState.isPlayed))
         let after = try await provider.continueWatching(limit: 10)
         XCTAssertEqual(after.map(\.title), ["Up"])
+    }
+
+    func test_favorites_markedOnTheDevice_listedByTitle_andRowsOnTheLibraryPage() async throws {
+        let provider = provider()
+        let movies = try await provider.libraries()[0]
+        try await provider.setFavorite(true, for: ref(.movie("11")))
+        try await provider.setFavorite(true, for: ref(.movie("10")))
+        try await provider.setFavorite(true, for: ref(.series("70")))
+        let favorites = try await provider.favorites(in: movies, limit: 10)
+        XCTAssertEqual(favorites.map(\.title), ["Heat", "Up"])
+        XCTAssertTrue(favorites.allSatisfy(\.userState.isFavorite))
+        let detail = try await provider.fullDetail(for: ref(.series("70")))
+        XCTAssertTrue(detail.item.userState.isFavorite)
+
+        try await provider.updateProgress(ref(.movie("12")), position: 600)
+        let rows = try await provider.hubs(in: movies)
+        XCTAssertEqual(rows.map(\.id), ["movies.continueWatching", "movies.favorites", "movies.recentlyAdded"])
+        XCTAssertEqual(rows[0].items.map(\.title), ["1917"])
+
+        try await provider.setFavorite(false, for: ref(.movie("11")))
+        let after = try await provider.favorites(in: movies, limit: 10)
+        XCTAssertEqual(after.map(\.title), ["Heat"])
+        do {
+            try await provider.setFavorite(true, for: ref(.episode(seriesID: "70", episodeID: "701")))
+            XCTFail("an episode is not a favorite")
+        } catch {}
     }
 
     func test_search_findsFilmsAndSeries() async throws {
