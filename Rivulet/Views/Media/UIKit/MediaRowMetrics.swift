@@ -48,6 +48,11 @@ enum MediaRowMetrics {
         var lockup = Lockup.poster
         /// Growth on focus (width, height), measured on device, tvOS 27.
         var growth = CGSize(width: MediaRowMetrics.focusGrowth, height: MediaRowMetrics.focusGrowth)
+        /// Room under the frame for the title line (`PosterTitleLabel`); 0 for tiles with none.
+        var caption: CGFloat = 0
+
+        /// The cell's height: the frame and the title line under it.
+        var cellHeight: CGFloat { frame.height + caption }
 
         /// Whole points: compositional layout floors a fractional item width,
         /// which would shorten the pitch.
@@ -81,13 +86,17 @@ enum MediaRowMetrics {
     /// 2:3 poster (PosterCell, WatchlistPosterCell, detail Related row).
     static let poster: Tile = {
         let width = gridWidth(columns: posterFullCount)
-        return Tile(art: CGSize(width: width, height: width * 1.5), growth: CGSize(width: 20, height: 30))
+        return Tile(art: CGSize(width: width, height: width * 1.5), growth: CGSize(width: 20, height: 30),
+                    caption: posterCaption)
     }()
+
+    /// The title line under a poster or square tile, as Apple's App Store and Music lockups have.
+    static let posterCaption: CGFloat = 40
     static let posterWidth = poster.frame.width
     static let posterHeight = poster.frame.height
 
     /// 1:1 square for music (artist/album/track): the poster's grid column.
-    static let music = Tile(art: CGSize(width: poster.art.width, height: poster.art.width))
+    static let music = Tile(art: CGSize(width: poster.art.width, height: poster.art.width), caption: posterCaption)
 
     /// A cast or crew circle over name and subtitle (`CastCell`), the detail page's cast row.
     /// The photo's focus effect is the system's, so the frame is the circle with no growth.
@@ -167,7 +176,8 @@ enum MediaRowMetrics {
     }
 
     /// Library poster grid: artwork top to the next row's artwork top (Apple's 55 between 390-tall tiles).
-    static var posterGridPitch: CGFloat { poster.art.height + 55 }
+    /// The title line under each poster adds its height.
+    static var posterGridPitch: CGFloat { poster.art.height + 55 + poster.caption }
 }
 
 extension NSLayoutConstraint {

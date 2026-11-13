@@ -3004,7 +3004,7 @@ final class PlexHomeViewController: UIViewController {
         // Posters sit on Apple's row pitch; the other tiles keep their padded rows with a gap.
         let isPosterGrid = !isPlaylists && !data.isMusic
         let groupHeight = isPosterGrid ? MediaRowMetrics.posterGridPitch
-            : tile.frame.height + MediaRowMetrics.focusGrowthPadding
+            : tile.cellHeight + MediaRowMetrics.focusGrowthPadding
 
         let itemSize = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1.0 / CGFloat(columns)),
@@ -3118,7 +3118,7 @@ final class PlexHomeViewController: UIViewController {
             ? MediaRowMetrics.continueWatching
             : section.isEpisodeRow ? EpisodeCollectionCell.searchTile
             : (section.isMusic ? MediaRowMetrics.music : MediaRowMetrics.poster))
-        let rowHeight = tile.frame.height + MediaRowMetrics.focusGrowthPadding  // room for focus growth
+        let rowHeight = tile.cellHeight + MediaRowMetrics.focusGrowthPadding  // room for focus growth and titles
 
         let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1),
                                               heightDimension: .absolute(rowHeight))

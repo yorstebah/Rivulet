@@ -267,7 +267,7 @@ final class PersonDetailViewController: UIViewController {
     /// the poster tile and focus-growth padding.
     private func makeShelfSectionLayout() -> NSCollectionLayoutSection {
         let shelfHeaderHeight: CGFloat = 44   // ShelfRowCell.headerHeight
-        let rowHeight = shelfHeaderHeight + MediaRowMetrics.posterHeight + MediaRowMetrics.focusGrowthPadding
+        let rowHeight = shelfHeaderHeight + MediaRowMetrics.poster.cellHeight + MediaRowMetrics.focusGrowthPadding
         let size = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1),
                                           heightDimension: .absolute(rowHeight))
         let item = NSCollectionLayoutItem(layoutSize: size)

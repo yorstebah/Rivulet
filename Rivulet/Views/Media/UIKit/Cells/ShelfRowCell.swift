@@ -21,7 +21,7 @@ final class ShelfRowCell: UICollectionViewCell {
 
         /// The cell: the lockup's frame, not its resting artwork.
         var tileWidth: CGFloat { tile?.frame.width ?? MediaRowMetrics.liveWidth }
-        var tileHeight: CGFloat { tile?.frame.height ?? MediaRowMetrics.liveHeight }
+        var tileHeight: CGFloat { tile?.cellHeight ?? MediaRowMetrics.liveHeight }
         /// The grid tile behind the kind; nil for Live TV, which has frame
         /// numbers of its own.
         private var tile: MediaRowMetrics.Tile? {

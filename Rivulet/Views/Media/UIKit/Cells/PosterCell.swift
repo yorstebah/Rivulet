@@ -2,7 +2,8 @@
 // Copyright (C) 2025-2026 Bain Gurley
 
 // Poster hub cell wrapping `TVPosterView` for native focus motion.
-// Caption stays nil: a set caption reserves bottom space even while hidden and crops 2:3 posters.
+// TVPosterView's caption stays nil: a set caption reserves bottom space even while hidden and crops
+// 2:3 posters. The title is our own `PosterTitleLabel` under the tile instead, in `Tile.caption`.
 // Overlays sit in a sibling `overlayContainer` that copies the poster's mask and focus scale,
 // because subviews added to `posterView.imageView` do not render.
 
@@ -30,6 +31,8 @@ final class PosterCell: UICollectionViewCell {
     /// The title on the failure card, so an item with no artwork is still named.
     private let failureTitle = UILabel()
     private let progressInfoBar = MediaProgressInfoBar()
+    private let titleLabel = PosterTitleLabel()
+    private var titleTopConstraint: NSLayoutConstraint!
 
     /// Apple-style watched glyph, bottom-left (the progress bar's slot).
     private let watchedGlyph = WatchedGlyphView()
@@ -184,10 +187,18 @@ final class PosterCell: UICollectionViewCell {
         watchedGlyph.isHidden = true
         overlayContainer.addSubview(watchedGlyph)
 
+        contentView.addSubview(titleLabel)
+
         posterWidthConstraint = posterView.widthAnchor.constraint(equalToConstant: tile.hostSize.width)
         posterHeightConstraint = posterView.heightAnchor.constraint(equalToConstant: tile.hostSize.height)
+        titleTopConstraint = titleLabel.topAnchor.constraint(equalTo: posterView.centerYAnchor,
+                                                            constant: PosterTitleLabel.topOffset(for: tile))
         NSLayoutConstraint.activate([
-            posterView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            // Raised by half the title line, which the cell is that much taller for.
+            posterView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor, constant: -tile.caption / 2),
+            titleTopConstraint,
+            titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            titleLabel.widthAnchor.constraint(equalTo: posterView.imageView.widthAnchor),
             posterView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             posterWidthConstraint,
             posterHeightConstraint,
@@ -254,6 +265,7 @@ final class PosterCell: UICollectionViewCell {
         coordinator.addCoordinatedAnimations({
             self.posterView.transform = nowFocused ? self.tile.focusScale : .identity
             self.progressInfoBar.setFocused(nowFocused)
+            self.titleLabel.setFocused(nowFocused)
             self.overlayContainer.transform = nowFocused
                 ? CGAffineTransform(scaleX: scale, y: scale)
                 : .identity
@@ -277,6 +289,7 @@ final class PosterCell: UICollectionViewCell {
         }
         clear(posterView)
         overlayContainer.transform = .identity
+        titleLabel.setFocused(false)
     }
 
     // MARK: - Configure
@@ -286,6 +299,7 @@ final class PosterCell: UICollectionViewCell {
         setSquare(["artist", "album", "track"].contains(item.type ?? ""))
         let url = posterURL(for: item)
         failureTitleText = item.title
+        titleLabel.text = item.title
         setEdition(item.editionTitle)
         loadImage(from: url, item: item)
         configureProgressBar(item: item)
@@ -300,6 +314,7 @@ final class PosterCell: UICollectionViewCell {
         let url = item.grandparentArtwork?.poster
             ?? (item.kind == .season ? item.parentArtwork?.poster : nil) ?? item.artwork.poster
         failureTitleText = item.title
+        titleLabel.text = item.title
         setEdition(item.editionTitle)
         loadImage(from: url, failureKind: item.kind)
         configureProgressBar(item: item)
@@ -323,6 +338,7 @@ final class PosterCell: UICollectionViewCell {
     private func setSquare(_ square: Bool) {
         tile = square ? MediaRowMetrics.music : MediaRowMetrics.poster
         let host = tile.hostSize
+        titleTopConstraint.constant = PosterTitleLabel.topOffset(for: tile)
         if posterHeightConstraint.constant != host.height {
             posterWidthConstraint.constant = host.width
             posterHeightConstraint.constant = host.height
@@ -346,6 +362,7 @@ final class PosterCell: UICollectionViewCell {
     }
 
     private func resetContent() {
+        titleLabel.text = nil
         imageLoadTask?.cancel()
         imageLoadTask = nil
         cancelSpinnerDelay()
