@@ -351,7 +351,7 @@ enum SettingsDescriptorStore {
         ),
         "src_tmdbKey": SettingDescriptor(
             icon: "info.circle",
-            description: "Your own key from themoviedb.org (free, under Settings > API). With it, a film's or series' page shows the plot in your language, the cast with photos and more, where the provider says little. Leave empty to turn it off."
+            description: "Your own free key from themoviedb.org. With it, film and series pages show the plot in your language and the cast with photos."
         ),
         "src_showInLiveTV": SettingDescriptor(
             icon: "tv.and.mediabox",
