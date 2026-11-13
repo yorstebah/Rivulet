@@ -1,6 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Add to List" : {},
     "Africa" : {},
     "Any" : {},
     "Asia" : {},
@@ -9,10 +10,13 @@
     "Country or Language" : {},
     "Delete Smart List" : {},
     "Delete Smart List?" : {},
+    "Delete “%@”…" : {},
     "Edit Smart List" : {},
     "Edit “%@”…" : {},
     "Ex-Yugoslav" : {},
     "International" : {},
+    "Its channels stay where they are." : {},
+    "List Name" : {},
     "Map" : {
       "localizations" : {
         "de" : {
@@ -33,6 +37,8 @@
     "Multilingual" : {},
     "Name Contains" : {},
     "Name Contains “%@”" : {},
+    "New List" : {},
+    "New List…" : {},
     "New Smart List" : {},
     "New Smart List…" : {},
     "On This Day" : {
@@ -68,6 +74,8 @@
         }
       }
     },
+    "Rename List" : {},
+    "Rename “%@”…" : {},
     "Save" : {},
     "Slideshow" : {
       "localizations" : {

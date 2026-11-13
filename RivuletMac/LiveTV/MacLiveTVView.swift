@@ -16,6 +16,7 @@ struct MacLiveTVView: View {
     @State private var jumpToken = 0
     /// The smart list editor: nil closed, "" a new list, else the list's id.
     @State private var editingSmartList: String?
+    @State private var deletingList: LiveChannelList?
     @ObservedObject private var channelLists = LiveChannelListStore.shared
     @State private var dismissedIssues = ""
     @EnvironmentObject private var playback: MacPlaybackController
@@ -30,6 +31,19 @@ struct MacLiveTVView: View {
             .navigationTitle("Live TV")
             .toolbar { toolbar }
             .macPageRefresh { Task { await reloadEverything() } }
+            .confirmationDialog(
+                deletingList.map { String(localized: "Delete \u{201C}\($0.name)\u{201D}?") } ?? "",
+                isPresented: Binding(get: { deletingList != nil }, set: { if !$0 { deletingList = nil } }),
+                titleVisibility: .visible,
+                presenting: deletingList
+            ) { list in
+                Button("Delete", role: .destructive) {
+                    channelLists.delete(list.id)
+                    guideFilter = ""
+                }
+            } message: { _ in
+                Text("Its channels stay where they are.")
+            }
             .sheet(isPresented: Binding(get: { editingSmartList != nil }, set: { if !$0 { editingSmartList = nil } })) {
                 MacLiveSmartListEditor(listId: editingSmartList.flatMap { $0.isEmpty ? nil : $0 }) { id in
                     guideFilter = id.map { LiveChannelList.filterPrefix + $0 } ?? ""
@@ -182,6 +196,14 @@ struct MacLiveTVView: View {
             if let list = LiveChannelList.forFilter(guideFilter, store: channelLists), list.isSmart {
                 Button { editingSmartList = list.id } label: {
                     Label("Edit \u{201C}\(list.name)\u{201D}…", systemImage: "pencil")
+                }
+            }
+            if let list = LiveChannelList.forFilter(guideFilter, store: channelLists), !list.isSmart {
+                Button { recorder.askRename(list) } label: {
+                    Label("Rename \u{201C}\(list.name)\u{201D}…", systemImage: "pencil")
+                }
+                Button(role: .destructive) { deletingList = list } label: {
+                    Label("Delete \u{201C}\(list.name)\u{201D}…", systemImage: "trash")
                 }
             }
         } label: {
