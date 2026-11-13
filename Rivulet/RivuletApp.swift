@@ -32,6 +32,11 @@ struct RivuletApp: App {
         if let key = ProcessInfo.processInfo.environment["RIVULET_OPEN_DETAIL"] {
             DeepLinkHandler.shared.handleDetail(ratingKey: key)
         }
+        // RIVULET_OPEN_LINK=rivulet://…: any link, another server's items included, with no system prompt.
+        if let text = ProcessInfo.processInfo.environment["RIVULET_OPEN_LINK"], let url = URL(string: text),
+           let link = RivuletLink(url: url) {
+            DeepLinkHandler.shared.handle(link)
+        }
         #endif
         // Default the Home hero ON for fresh installs (and any user who hasn't
         // explicitly toggled it). The home reads this via UserDefaults.bool(),
