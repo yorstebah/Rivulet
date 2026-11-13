@@ -1894,7 +1894,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     /// art, "504 · Fox Footy", and the current programme title.
     private func presentChannelListPanel() {
         let store = LiveTVDataStore.shared
-        let channels = store.channels
+        // A large IPTV lineup lists the playing channel's group, not every channel.
+        let channels = LiveChannelsPaneScope.channels(store.channels, playing: channel)
         guard !channels.isEmpty else { return }
 
         let list = LiveChannelsPaneView(
