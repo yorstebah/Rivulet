@@ -240,6 +240,11 @@ final class XtreamVODProviderTests: XCTestCase {
         let episode = try await provider.resolveStream(for: ref(.episode(seriesID: "70", episodeID: "702")),
                                                        sourceID: nil, maxBitrate: nil)
         XCTAssertEqual(episode.source.streamURL?.absoluteString, "http://panel.example:8080/series/user/pass/702.mkv")
+
+        // Once played, a listed film knows its length (Continue Watching's progress bar).
+        try await provider.updateProgress(ref(.movie("10")), position: 600)
+        let listed = try await provider.continueWatching(limit: 5).first { $0.title == "Heat" }
+        XCTAssertEqual(listed?.runtime, 10200)
     }
 
     func test_watchState_continueWatching_andMarkingASeries() async throws {
@@ -255,6 +260,7 @@ final class XtreamVODProviderTests: XCTestCase {
         let continuing = try await provider.continueWatching(limit: 10)
         XCTAssertEqual(Set(continuing.map(\.title)), ["The Target", "Up"])
         XCTAssertEqual(continuing.first { $0.title == "The Target" }?.userState.viewOffset, 1200)
+        XCTAssertEqual(continuing.first { $0.title == "The Target" }?.runtime, 3600)
 
         try await provider.markPlayed(ref(.series("70")))
         let episodes = try await provider.allEpisodes(of: ref(.series("70")))

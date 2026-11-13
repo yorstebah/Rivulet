@@ -118,7 +118,9 @@ nonisolated enum XtreamVODMapping {
         return MediaItem(
             ref: MediaItemRef(providerID: provider, itemID: XtreamVODID.movie(movie.id).itemID),
             kind: .movie, title: movie.name, sortTitle: nil, overview: nil, year: movie.year,
-            runtime: nil,
+            // Lists carry no length; the player noted it on the device once the film played,
+            // which is what a progress bar and the time left need.
+            runtime: state.records[key]?.duration,
             parentRef: nil, grandparentRef: nil, episodeNumber: nil, seasonNumber: nil, childProgress: nil,
             userState: userState(state.records[key], favorite: state.favorites.contains(key)),
             artwork: MediaArtwork(poster: movie.posterURL, backdrop: nil, thumbnail: movie.posterURL, logo: nil),
