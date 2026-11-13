@@ -2357,7 +2357,9 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     private func handleHiddenChromeDirection(_ direction: DirectionalInputBinding.Direction) {
         switch direction {
         case .left:
-            skip(by: -InputConfig.tapSeekBackSeconds)
+            // Nothing: most live channels hold no rewind to skip into. The rail's skip
+            // buttons stay for those that do.
+            break
         case .right:
             // The guide over the picture; the rail's skip button skips forward.
             presentGuideOverlay()
