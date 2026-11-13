@@ -636,8 +636,15 @@ struct EPGGuide: UIViewRepresentable {
             cv.setContentOffset(CGPoint(x: lockedX, y: targetY), animated: false)
             cv.layoutIfNeeded()
             if parent.onExit != nil, let container = cv.superview as? EPGContainerView,
-               let cell = cv.cellForItem(at: IndexPath(item: item, section: section)) {
-                container.initialFocusTarget = cell
+               cv.cellForItem(at: IndexPath(item: item, section: section)) != nil {
+                // The channel, not its cell: a reload before focus arrives reuses cells, and a
+                // held cell would by then show another channel's programme.
+                container.initialFocusResolver = { [weak self, weak cv] in
+                    guard let self, let cv,
+                          let section = self.sections.firstIndex(where: { $0.id == channelId }),
+                          let item = self.liveItem(inSection: section) else { return nil }
+                    return cv.cellForItem(at: IndexPath(item: item, section: section))
+                }
             }
             requestFocus(IndexPath(item: item, section: section))
         }
@@ -902,9 +909,16 @@ final class EPGContainerView: UIView {
         return isDescendant(of: top.view)
     }
 
-    /// The programme focus first enters on, opened from the List. Cleared
-    /// once focus is inside the guide.
-    weak var initialFocusTarget: UIView?
+    /// The programme focus first enters on, opened from the List or over the player: the
+    /// channel's programme airing now, looked up each time it is asked. Cleared once focus
+    /// is inside the guide.
+    var initialFocusTarget: UIView? {
+        get { initialFocusResolver?() }
+        set { if newValue == nil { initialFocusResolver = nil } }
+    }
+
+    /// Finds `initialFocusTarget`'s cell as the grid is now.
+    var initialFocusResolver: (() -> UIView?)?
 
     /// Complete the category-to-grid handoff after the directional focus update
     /// that requested it has ended. Calling `updateFocusIfNeeded` inline from a
