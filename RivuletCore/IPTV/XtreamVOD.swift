@@ -33,6 +33,9 @@ nonisolated struct XtreamMovie: Sendable, Equatable, Codable {
     let year: Int?
     /// The file's container, which is also the stream URL's extension.
     let containerExtension: String
+    /// The tags the panel put before the name ("NL", "FR-4K"): one film is often listed once
+    /// per language, and this tells the copies apart.
+    var tag: String? = nil
 }
 
 /// A film's details from `get_vod_info`.
@@ -61,6 +64,8 @@ nonisolated struct XtreamSeries: Sendable, Equatable, Codable {
     let rating: Double?
     let year: Int?
     let updatedAt: Date?
+    /// As on `XtreamMovie`.
+    var tag: String? = nil
 }
 
 nonisolated struct XtreamSeason: Sendable, Equatable {
@@ -168,7 +173,8 @@ extension XtreamService {
         list(json).compactMap { entry in
             guard let id = string(entry["stream_id"]),
                   let listed = string(entry["name"]), !isSectionHeader(listed) else { return nil }
-            let (name, nameYear) = splitYear(cleanName(listed))
+            let (bare, tags) = splitTags(listed)
+            let (name, nameYear) = splitYear(bare)
             return XtreamMovie(
                 id: id, name: name,
                 categoryId: string(entry["category_id"]),
@@ -176,7 +182,8 @@ extension XtreamService {
                 rating: rating(entry),
                 addedAt: date(entry["added"]),
                 year: year(entry["year"]) ?? year(entry["releaseDate"]) ?? year(entry["release_date"]) ?? nameYear,
-                containerExtension: string(entry["container_extension"]) ?? "mp4")
+                containerExtension: string(entry["container_extension"]) ?? "mp4",
+                tag: tags.isEmpty ? nil : tags.joined(separator: " "))
         }
     }
 
@@ -201,7 +208,8 @@ extension XtreamService {
         list(json).compactMap { entry in
             guard let id = string(entry["series_id"]),
                   let listed = string(entry["name"]), !isSectionHeader(listed) else { return nil }
-            let (name, nameYear) = splitYear(cleanName(listed))
+            let (bare, tags) = splitTags(listed)
+            let (name, nameYear) = splitYear(bare)
             return XtreamSeries(
                 id: id, name: name,
                 categoryId: string(entry["category_id"]),
@@ -211,7 +219,8 @@ extension XtreamService {
                 genre: string(entry["genre"]),
                 rating: rating(entry),
                 year: year(entry["year"]) ?? year(entry["releaseDate"]) ?? year(entry["release_date"]) ?? nameYear,
-                updatedAt: date(entry["last_modified"]))
+                updatedAt: date(entry["last_modified"]),
+                tag: tags.isEmpty ? nil : tags.joined(separator: " "))
         }
     }
 
@@ -266,14 +275,20 @@ extension XtreamService {
     /// ("┃NL┃ ", "┃FR-4K┃", "[EN] ", "NL | ", "┃NL " with its closing bar missing), and with
     /// single spaces. Never a colon, which titles use ("CSI: Miami"). The category already says
     /// the language. A name that is only tags keeps them.
-    nonisolated static func cleanName(_ name: String) -> String {
+    nonisolated static func cleanName(_ name: String) -> String { splitTags(name).name }
+
+    /// `cleanName` with the tags it left out, each without its bars ("NL", "FR-4K").
+    nonisolated static func splitTags(_ name: String) -> (name: String, tags: [String]) {
         var rest = Substring(name)
+        var tags: [String] = []
         let tag = #"^\s*(?:┃[^┃|\n]{1,12}[┃|]|┃[A-Z]{2,5}(?=\s)|\|\s*[A-Z0-9+-]{2,8}\s*[┃|]|\[[A-Z]{2}\]|[A-Z]{2,4}(?:-[A-Z0-9]{2,4})?\s*[┃|])\s*"#
         while let match = rest.range(of: tag, options: .regularExpression), match.upperBound < rest.endIndex {
+            let text = rest[match].trimmingCharacters(in: CharacterSet(charactersIn: "┃|[]").union(.whitespaces))
+            if !text.isEmpty { tags.append(text) }
             rest = rest[match.upperBound...]
         }
         let single = rest.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return single.isEmpty ? name : single
+        return single.isEmpty ? (name, []) : (single, tags)
     }
 
     /// A year many panels put at the end of the name instead of in a field ("White Chicks - 2004",

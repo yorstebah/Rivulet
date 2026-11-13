@@ -161,6 +161,9 @@ final class XtreamVODTests: XCTestCase {
         let parsed = XtreamService.movies(from: try! JSONSerialization.jsonObject(with: Data(#"[{"stream_id": 1, "name": "┃NL┃  Heat (1995)"}]"#.utf8)))
         XCTAssertEqual(parsed.first?.name, "Heat")
         XCTAssertEqual(parsed.first?.year, 1995)
+        XCTAssertEqual(parsed.first?.tag, "NL")
+        XCTAssertEqual(XtreamService.splitTags("[EN] ┃FR-4K┃ Dune").tags, ["EN", "FR-4K"])
+        XCTAssertTrue(XtreamService.splitTags("Dune").tags.isEmpty)
     }
 
     func test_tagsInFrontOfTheName_areLeftOut() {

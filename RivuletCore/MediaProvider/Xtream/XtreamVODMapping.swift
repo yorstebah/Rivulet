@@ -123,6 +123,8 @@ nonisolated enum XtreamVODMapping {
             userState: userState(state.records[key], favorite: state.favorites.contains(key)),
             artwork: MediaArtwork(poster: movie.posterURL, backdrop: nil, thumbnail: movie.posterURL, logo: nil),
             parentArtwork: nil, grandparentArtwork: nil,
+            // The poster's edition badge tells a film's language copies apart.
+            editionTitle: movie.tag,
             libraryID: XtreamVODLibrary.movies.rawValue)
     }
 
@@ -136,6 +138,7 @@ nonisolated enum XtreamVODMapping {
             artwork: MediaArtwork(poster: series.coverURL, backdrop: series.backdropURL,
                                   thumbnail: series.coverURL, logo: nil),
             parentArtwork: nil, grandparentArtwork: nil,
+            editionTitle: series.tag,
             genres: genres(series.genre),
             libraryID: XtreamVODLibrary.series.rawValue)
     }
