@@ -216,6 +216,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     private let focusCatcher = FocusCatcherView()
     /// The rail shows once as each channel's picture first appears.
     private var didShowRailOnJoin = false
+    /// The viewer paused this channel since it started, so a jump on resume needs a word.
+    private var pausedSinceJoin = false
     /// The guide over the playing channel (Right), while it is open.
     private var guideOverlay: UIViewController?
 
@@ -405,6 +407,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         loadingSpinner.startAnimating()
         isUserPaused = false
         didShowRailOnJoin = false
+        pausedSinceJoin = false
 
         // Sticky per-channel subtitle delay (OSD stepper). Re-read per channel:
         // the key is derived from the channel id.
@@ -497,10 +500,12 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         aether.liveResumeSkips
             .receive(on: DispatchQueue.main)
             .sink { [weak self] skipped in
-                guard skipped >= 1 else { return }
+                // Only after a pause: the engine also clamps a fresh join onto the
+                // window by a few seconds, which no viewer caused or needs explaining.
+                guard let self, self.pausedSinceJoin, skipped >= 1 else { return }
                 let minutes = Int((skipped / 60).rounded())
                 let seconds = Int(skipped.rounded())
-                self?.noticeView.show(minutes >= 1
+                self.noticeView.show(minutes >= 1
                     ? String(localized: "Jumped ahead \(minutes) min. The pause ran past what the rewind buffer holds.")
                     : String(localized: "Jumped ahead \(seconds) sec. The pause ran past what the rewind buffer holds."))
             }
@@ -2377,6 +2382,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         endScrub()
         windowSeeker.cancelPending()
         isUserPaused = true
+        pausedSinceJoin = true
         if let lastResortPlayer {
             lastResortPlayer.pause()
         } else {
