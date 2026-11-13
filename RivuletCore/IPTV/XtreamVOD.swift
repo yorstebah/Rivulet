@@ -167,14 +167,15 @@ extension XtreamService {
     nonisolated static func movies(from json: Any) -> [XtreamMovie] {
         list(json).compactMap { entry in
             guard let id = string(entry["stream_id"]),
-                  let name = string(entry["name"]), !isSectionHeader(name) else { return nil }
+                  let listed = string(entry["name"]), !isSectionHeader(listed) else { return nil }
+            let (name, nameYear) = splitYear(cleanName(listed))
             return XtreamMovie(
                 id: id, name: name,
                 categoryId: string(entry["category_id"]),
                 posterURL: url(entry["stream_icon"]),
                 rating: rating(entry),
                 addedAt: date(entry["added"]),
-                year: year(entry["year"]) ?? year(entry["releaseDate"]) ?? year(entry["release_date"]),
+                year: year(entry["year"]) ?? year(entry["releaseDate"]) ?? year(entry["release_date"]) ?? nameYear,
                 containerExtension: string(entry["container_extension"]) ?? "mp4")
         }
     }
@@ -199,7 +200,8 @@ extension XtreamService {
     nonisolated static func series(from json: Any) -> [XtreamSeries] {
         list(json).compactMap { entry in
             guard let id = string(entry["series_id"]),
-                  let name = string(entry["name"]), !isSectionHeader(name) else { return nil }
+                  let listed = string(entry["name"]), !isSectionHeader(listed) else { return nil }
+            let (name, nameYear) = splitYear(cleanName(listed))
             return XtreamSeries(
                 id: id, name: name,
                 categoryId: string(entry["category_id"]),
@@ -208,7 +210,7 @@ extension XtreamService {
                 plot: string(entry["plot"]),
                 genre: string(entry["genre"]),
                 rating: rating(entry),
-                year: year(entry["year"]) ?? year(entry["releaseDate"]) ?? year(entry["release_date"]),
+                year: year(entry["year"]) ?? year(entry["releaseDate"]) ?? year(entry["release_date"]) ?? nameYear,
                 updatedAt: date(entry["last_modified"]))
         }
     }
@@ -259,6 +261,36 @@ extension XtreamService {
     }
 
     // MARK: Field helpers
+
+    /// The title a viewer reads: without the language or quality tags panels put in front
+    /// ("┃NL┃ ", "┃FR-4K┃", "[EN] ", "NL | ", "┃NL " with its closing bar missing), and with
+    /// single spaces. Never a colon, which titles use ("CSI: Miami"). The category already says
+    /// the language. A name that is only tags keeps them.
+    nonisolated static func cleanName(_ name: String) -> String {
+        var rest = Substring(name)
+        let tag = #"^\s*(?:┃[^┃|\n]{1,12}[┃|]|┃[A-Z]{2,5}(?=\s)|\|\s*[A-Z0-9+-]{2,8}\s*[┃|]|\[[A-Z]{2}\]|[A-Z]{2,4}(?:-[A-Z0-9]{2,4})?\s*[┃|])\s*"#
+        while let match = rest.range(of: tag, options: .regularExpression), match.upperBound < rest.endIndex {
+            rest = rest[match.upperBound...]
+        }
+        let single = rest.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return single.isEmpty ? name : single
+    }
+
+    /// A year many panels put at the end of the name instead of in a field ("White Chicks - 2004",
+    /// "Wildschut (1985)"): the name without it, and the year. A name that is only a year keeps it.
+    nonisolated static func splitYear(_ name: String) -> (name: String, year: Int?) {
+        let patterns = [#"\s*[-–|]\s*((?:19|20)\d\d)\s*$"#, #"\s*\(((?:19|20)\d\d)\)(?:\s*\([A-Za-z]{2,8}\))?\s*$"#]
+        for pattern in patterns {
+            guard let match = name.range(of: pattern, options: .regularExpression) else { continue }
+            let rest = name[..<match.lowerBound].trimmingCharacters(in: .whitespaces)
+            let digits = name[match].filter(\.isNumber)
+            guard !rest.isEmpty, let year = Int(digits), year <= Calendar.current.component(.year, from: Date()) + 1 else {
+                continue
+            }
+            return (rest, year)
+        }
+        return (name, nil)
+    }
 
     private nonisolated static func list(_ json: Any) -> [[String: Any]] {
         json as? [[String: Any]] ?? []

@@ -35,6 +35,16 @@ actor XtreamVODCatalog {
     private var seriesInfos: [String: XtreamSeriesInfo] = [:]
     private var seriesInfoLoads: [String: Task<XtreamSeriesInfo, Error>] = [:]
 
+    /// Work done once per list rather than per page or keystroke: each sort's order,
+    /// the names folded for search, the A to Z counts. Keyed by the list's fetch time.
+    private struct Derived {
+        var fetchedAt: Date
+        var orders: [SortOption: [Int]] = [:]
+        var searchNames: [String]?
+        var letters: [PlexFirstCharacter]?
+    }
+    private var derived: [XtreamVODLibrary: Derived] = [:]
+
     init(service: XtreamService, sourceID: String, directory: URL? = XtreamVODCatalog.defaultDirectory) {
         self.service = service
         self.sourceID = sourceID
@@ -104,6 +114,84 @@ actor XtreamVODCatalog {
         }
     }
 
+    // MARK: Listing
+
+    /// One page of a library in `sort` order.
+    func moviePage(sort: SortOption, page: Page) async throws -> (items: [XtreamMovie], total: Int) {
+        let lists = try await movieLists()
+        let order = self.order(.movies, lists.fetchedAt, sort) { lists.titles.map(XtreamVODMapping.sortable) }
+        return (Self.slice(order, page).map { lists.titles[$0] }, order.count)
+    }
+
+    func seriesPage(sort: SortOption, page: Page) async throws -> (items: [XtreamSeries], total: Int) {
+        let lists = try await seriesLists()
+        let order = self.order(.series, lists.fetchedAt, sort) { lists.titles.map(XtreamVODMapping.sortable) }
+        return (Self.slice(order, page).map { lists.titles[$0] }, order.count)
+    }
+
+    func searchMovies(_ query: String, limit: Int) async throws -> [XtreamMovie] {
+        let lists = try await movieLists()
+        let names = searchNames(.movies, lists.fetchedAt) { lists.titles.map(\.name) }
+        return XtreamVODMapping.search(query, in: names, limit: limit).map { lists.titles[$0] }
+    }
+
+    func searchSeries(_ query: String, limit: Int) async throws -> [XtreamSeries] {
+        let lists = try await seriesLists()
+        let names = searchNames(.series, lists.fetchedAt) { lists.titles.map(\.name) }
+        return XtreamVODMapping.search(query, in: names, limit: limit).map { lists.titles[$0] }
+    }
+
+    func letterCounts(_ library: XtreamVODLibrary) async throws -> [PlexFirstCharacter] {
+        let fetchedAt: Date
+        let names: [String]
+        switch library {
+        case .movies:
+            let lists = try await movieLists()
+            fetchedAt = lists.fetchedAt
+            if let letters = fresh(library, fetchedAt).letters { return letters }
+            names = lists.titles.map(\.name)
+        case .series:
+            let lists = try await seriesLists()
+            fetchedAt = lists.fetchedAt
+            if let letters = fresh(library, fetchedAt).letters { return letters }
+            names = lists.titles.map(\.name)
+        }
+        var entry = fresh(library, fetchedAt)
+        let letters = XtreamVODMapping.letterCounts(names)
+        entry.letters = letters
+        derived[library] = entry
+        return letters
+    }
+
+    private func fresh(_ library: XtreamVODLibrary, _ fetchedAt: Date) -> Derived {
+        if let entry = derived[library], entry.fetchedAt == fetchedAt { return entry }
+        return Derived(fetchedAt: fetchedAt)
+    }
+
+    private func order(_ library: XtreamVODLibrary, _ fetchedAt: Date, _ sort: SortOption,
+                       _ sortables: () -> [XtreamVODMapping.Sortable]) -> [Int] {
+        var entry = fresh(library, fetchedAt)
+        if let order = entry.orders[sort] { return order }
+        let order = XtreamVODMapping.order(sortables(), by: sort)
+        entry.orders[sort] = order
+        derived[library] = entry
+        return order
+    }
+
+    private func searchNames(_ library: XtreamVODLibrary, _ fetchedAt: Date, _ names: () -> [String]) -> [String] {
+        var entry = fresh(library, fetchedAt)
+        if let known = entry.searchNames { return known }
+        let folded = names().map(LiveChannelSearch.normalized)
+        entry.searchNames = folded
+        derived[library] = entry
+        return folded
+    }
+
+    private static func slice(_ order: [Int], _ page: Page) -> ArraySlice<Int> {
+        let start = min(max(page.offset, 0), order.count)
+        return order[start..<min(start + max(page.limit, 0), order.count)]
+    }
+
     // MARK: Details
 
     func movieInfo(_ id: String) async throws -> XtreamMovieInfo {
@@ -133,7 +221,8 @@ actor XtreamVODCatalog {
 
     private func file(_ name: String) -> URL? {
         let safe = sourceID.map { $0.isLetter || $0.isNumber ? $0 : "_" }
-        return directory?.appending(component: "\(String(safe))-\(name).json")
+        // v2: names without their year, which moved to the year field.
+        return directory?.appending(component: "\(String(safe))-\(name)-v2.json")
     }
 
     private func read<T: Codable & Sendable>(_ name: String) -> XtreamVODLists<T>? {
@@ -151,7 +240,7 @@ actor XtreamVODCatalog {
     nonisolated static func forget(sourceID: String, directory: URL? = defaultDirectory) {
         guard let directory else { return }
         let safe = String(sourceID.map { $0.isLetter || $0.isNumber ? $0 : "_" })
-        for name in ["movies", "series"] {
+        for name in ["movies", "series", "movies-v2", "series-v2"] {
             try? FileManager.default.removeItem(at: directory.appending(component: "\(safe)-\(name).json"))
         }
     }

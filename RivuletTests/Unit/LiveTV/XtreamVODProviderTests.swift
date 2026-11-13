@@ -182,7 +182,7 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertTrue(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-3600)))
         XCTAssertFalse(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-2 * 86400)))
         let file = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-            .first { $0.lastPathComponent.hasSuffix("-movies.json") })
+            .first { $0.lastPathComponent.contains("-movies") })
         var stale = try JSONDecoder().decode(XtreamVODLists<XtreamMovie>.self, from: Data(contentsOf: file))
         stale.fetchedAt = Date().addingTimeInterval(-2 * 86400)
         try JSONEncoder().encode(stale).write(to: file)

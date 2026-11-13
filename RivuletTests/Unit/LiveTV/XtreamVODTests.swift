@@ -147,4 +147,41 @@ final class XtreamVODTests: XCTestCase {
         XCTAssertEqual(XtreamService.fileExtension(""), "mp4")
         XCTAssertEqual(XtreamService.fileExtension("m/p4"), "mp4")
     }
+
+    // MARK: Year in the name
+
+    func test_yearAtTheEndOfTheName_becomesTheYear() {
+        XCTAssertEqual(XtreamService.splitYear("┃MULTI┃ White Chicks - 2004").name, "┃MULTI┃ White Chicks")
+        XCTAssertEqual(XtreamService.splitYear("┃MULTI┃ White Chicks - 2004").year, 2004)
+        XCTAssertEqual(XtreamService.splitYear("Wildschut [Stronghold] (1985)").year, 1985)
+        XCTAssertEqual(XtreamService.splitYear("Wildschut [Stronghold] (1985)").name, "Wildschut [Stronghold]")
+        XCTAssertNil(XtreamService.splitYear("2012").year)
+        XCTAssertNil(XtreamService.splitYear("Blade Runner 2049").year)
+        XCTAssertEqual(XtreamService.splitYear("Blade Runner 2049 - 2017").name, "Blade Runner 2049")
+        let parsed = XtreamService.movies(from: try! JSONSerialization.jsonObject(with: Data(#"[{"stream_id": 1, "name": "┃NL┃  Heat (1995)"}]"#.utf8)))
+        XCTAssertEqual(parsed.first?.name, "Heat")
+        XCTAssertEqual(parsed.first?.year, 1995)
+    }
+
+    func test_tagsInFrontOfTheName_areLeftOut() {
+        XCTAssertEqual(XtreamService.cleanName("┃NL┃  Origin"), "Origin")
+        XCTAssertEqual(XtreamService.cleanName("┃DE┃Das etruskische Lächeln (2018)"), "Das etruskische Lächeln (2018)")
+        XCTAssertEqual(XtreamService.cleanName("┃FR-4K┃ Dune"), "Dune")
+        XCTAssertEqual(XtreamService.cleanName("┃VO| Heat"), "Heat")
+        XCTAssertEqual(XtreamService.cleanName("[EN] ┃MULTI┃ Up"), "Up")
+        XCTAssertEqual(XtreamService.cleanName("NL | Flikken Maastricht"), "Flikken Maastricht")
+        XCTAssertEqual(XtreamService.cleanName("┃GR┃ Μάρκο Πόλο [Marco Polo: One Hundred Eyes]"), "Μάρκο Πόλο [Marco Polo: One Hundred Eyes]")
+        // Not tags: a title's own words, and a name that is nothing else.
+        XCTAssertEqual(XtreamService.cleanName("Mission: Impossible"), "Mission: Impossible")
+        XCTAssertEqual(XtreamService.cleanName("┃US┃ CSI: Miami"), "CSI: Miami")
+        XCTAssertEqual(XtreamService.cleanName("M*A*S*H"), "M*A*S*H")
+        XCTAssertEqual(XtreamService.cleanName("┃NL┃ [REC] 2"), "[REC] 2")
+        XCTAssertEqual(XtreamService.cleanName("| PAK\u{00A0}| Golden Boy"), "Golden Boy")
+        XCTAssertEqual(XtreamService.cleanName("| USA┃ Malditos"), "Malditos")
+        XCTAssertEqual(XtreamService.cleanName("┃NL┃"), "┃NL┃")
+        XCTAssertEqual(XtreamService.cleanName("┃NL Liever verliefd"), "Liever verliefd")
+        XCTAssertEqual(XtreamService.splitYear("Mutronics (1991) (VF)").name, "Mutronics")
+        XCTAssertEqual(XtreamService.splitYear("Mutronics (1991) (VF)").year, 1991)
+        XCTAssertEqual(XtreamService.splitYear(XtreamService.cleanName("┃GR┃ Human.Vapor [ガス人間 ](2026)")).year, 2026)
+    }
 }

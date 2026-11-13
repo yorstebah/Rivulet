@@ -277,19 +277,25 @@ nonisolated enum XtreamVODMapping {
 
     /// Titles whose every query word starts a word of the name, or appears in it; word starts first.
     static func search<T>(_ query: String, in values: [T], name: (T) -> String, limit: Int) -> [T] {
+        search(query, in: values.map { LiveChannelSearch.normalized(name($0)) }, limit: limit).map { values[$0] }
+    }
+
+    /// The same over names already normalized (`LiveChannelSearch.normalized`), as positions:
+    /// a large panel keeps them, rather than folding every name on every keystroke.
+    static func search(_ query: String, in normalized: [String], limit: Int) -> [Int] {
         let tokens = LiveChannelSearch.normalized(query).split(separator: " ")
         guard !tokens.isEmpty else { return [] }
-        var starts: [T] = []
-        var anywhere: [T] = []
-        for value in values {
-            let normalized = LiveChannelSearch.normalized(name(value))
-            let words = normalized.split(separator: " ")
+        var starts: [Int] = []
+        var anywhere: [Int] = []
+        for (index, name) in normalized.enumerated() {
+            guard tokens.allSatisfy({ name.contains($0) }) else { continue }
+            let words = name.split(separator: " ")
             if tokens.allSatisfy({ token in words.contains { $0.hasPrefix(token) } }) {
-                starts.append(value)
-            } else if tokens.allSatisfy({ normalized.contains($0) }) {
-                anywhere.append(value)
+                starts.append(index)
+                if starts.count >= limit { break }
+            } else if anywhere.count < limit {
+                anywhere.append(index)
             }
-            if starts.count >= limit { break }
         }
         return Array((starts + anywhere).prefix(limit))
     }

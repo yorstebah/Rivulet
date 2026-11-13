@@ -115,12 +115,10 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let result: (items: [MediaItem], total: Int)
         switch XtreamVODLibrary(rawValue: library.id) {
         case .movies:
-            let page = XtreamVODMapping.page(try await catalog.movieLists().titles, sortable: XtreamVODMapping.sortable,
-                                             sort: sort, page: page)
+            let page = try await catalog.moviePage(sort: sort, page: page)
             result = (page.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
         case .series:
-            let page = XtreamVODMapping.page(try await catalog.seriesLists().titles, sortable: XtreamVODMapping.sortable,
-                                             sort: sort, page: page)
+            let page = try await catalog.seriesPage(sort: sort, page: page)
             result = (page.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
         case nil:
             throw MediaProviderError.notFound
@@ -139,8 +137,8 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
 
     func letterCounts(in library: MediaLibrary) async throws -> [PlexFirstCharacter] {
         switch XtreamVODLibrary(rawValue: library.id) {
-        case .movies: XtreamVODMapping.letterCounts(try await catalog.movieLists().titles.map(\.name))
-        case .series: XtreamVODMapping.letterCounts(try await catalog.seriesLists().titles.map(\.name))
+        case .movies: try await catalog.letterCounts(.movies)
+        case .series: try await catalog.letterCounts(.series)
         case nil: []
         }
     }
@@ -217,11 +215,10 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     // MARK: - Search
 
     func search(_ query: String) async throws -> [MediaItem] {
-        async let shows = catalog.seriesLists()
         let state = await state()
-        let movies = XtreamVODMapping.search(query, in: try await catalog.movieLists().titles, name: \.name, limit: 50)
+        let movies = try await catalog.searchMovies(query, limit: 50)
             .map { XtreamVODMapping.item($0, provider: id, state: state) }
-        let series = XtreamVODMapping.search(query, in: (try? await shows)?.titles ?? [], name: \.name, limit: 50)
+        let series = ((try? await catalog.searchSeries(query, limit: 50)) ?? [])
             .map { XtreamVODMapping.item($0, provider: id, state: state) }
         return movies + series
     }
