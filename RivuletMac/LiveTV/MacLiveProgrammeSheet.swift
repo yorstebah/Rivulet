@@ -52,9 +52,9 @@ struct MacLiveProgrammeSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 MacLiveLogo(url: channel.logoURL).frame(width: 40, height: 24)
-                Text(channel.numberAndName).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                Text(channel.displayNumberAndName).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             }
-            Text(program?.displayTitle ?? channel.name).font(.title2.bold())
+            Text(program?.displayTitle ?? channel.displayName).font(.title2.bold())
             if let subtitle = program?.subtitle, !subtitle.isEmpty, subtitle != program?.title {
                 Text(subtitle).font(.headline)
             }
@@ -85,7 +85,7 @@ struct MacLiveProgrammeSheet: View {
                     onWatch(channel)
                     dismiss()
                 } label: {
-                    Label(airing ? "Watch" : "Watch \(channel.name) Live", systemImage: "play.fill")
+                    Label(airing ? "Watch" : "Watch \(channel.displayName) Live", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -154,7 +154,7 @@ struct MacLiveChannelPicker: View {
             HStack(spacing: 12) {
                 MacLiveLogo(url: channel.logoURL).frame(width: 52, height: 32)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(channel.numberAndName).foregroundStyle(.primary)
+                    Text(channel.displayNumberAndName).foregroundStyle(.primary)
                     if let programme = store.getCurrentProgram(for: channel) {
                         Text(programme.displayTitle).font(.subheadline).foregroundStyle(.secondary)
                     }

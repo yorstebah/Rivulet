@@ -169,7 +169,8 @@ struct IOSLiveTVView: View {
                 if hasFavorites {
                     Label("Favorites", systemImage: "star").tag(Self.favoritesFilter)
                 }
-                ForEach(groups, id: \.self) { Text($0).tag($0) }
+                let names = LiveGroupDisplay.names(groups)
+                ForEach(groups, id: \.self) { Text(verbatim: names[$0] ?? $0).tag($0) }
             }
         } label: {
             // The toolbar glass is the circle; an active filter tints the glyph.

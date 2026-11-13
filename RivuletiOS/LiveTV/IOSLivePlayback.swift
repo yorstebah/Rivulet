@@ -72,8 +72,8 @@ final class IOSLivePlayback: ObservableObject, IOSPlaybackSession {
     var nowPlayingItem: IOSNowPlaying.Item {
         let programme = programme
         return IOSNowPlaying.Item(
-            title: programme?.displayTitle ?? channel.name,
-            subtitle: programme == nil ? nil : channel.name,
+            title: programme?.displayTitle ?? channel.displayName,
+            subtitle: programme == nil ? nil : channel.displayName,
             artworkURL: channel.logoURL,
             isLive: true
         )
@@ -181,8 +181,8 @@ private struct IOSLivePlayerScreen: View {
         TimelineView(.periodic(from: .now, by: 15)) { context in
             let programme = programme(at: context.date)
             IOSPlayerChrome(
-                title: programme?.displayTitle ?? session.channel.name,
-                subtitle: session.channel.numberAndName,
+                title: programme?.displayTitle ?? session.channel.displayName,
+                subtitle: session.channel.displayNumberAndName,
                 isPlaying: player.state == .playing,
                 isBusy: session.notice == nil && (player.state == .idle || player.state == .loading || player.isBuffering),
                 timeline: .live(
@@ -390,7 +390,7 @@ struct IOSLiveChannelPicker: View {
                 IOSLiveLogo(url: channel.logoURL)
                     .frame(width: 52, height: 32)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(channel.numberAndName).foregroundStyle(.primary)
+                    Text(channel.displayNumberAndName).foregroundStyle(.primary)
                     if let programme = store.getCurrentProgram(for: channel) {
                         Text(programme.displayTitle)
                             .font(.subheadline)
