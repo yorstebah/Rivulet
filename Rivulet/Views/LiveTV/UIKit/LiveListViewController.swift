@@ -92,6 +92,9 @@ final class LiveListViewController: UIViewController {
     private var channelEntryGesture = -1
 
     private static let timeFormat = Date.FormatStyle.dateTime.hour().minute()
+    #if DEBUG
+    private static var debugPlayed = false
+    #endif
 
     init(sourceIdFilter: String?) {
         self.sourceIdFilter = sourceIdFilter
@@ -165,6 +168,25 @@ final class LiveListViewController: UIViewController {
         super.viewDidAppear(animated)
         // Again on each appear: handlers are asked newest first.
         MenuPressInterceptor.register(self)
+        #if DEBUG
+        // RIVULET_LIST_PLAY=<name part>: play that channel from the List, as Select on its row does.
+        if let name = ProcessInfo.processInfo.environment["RIVULET_LIST_PLAY"], !Self.debugPlayed {
+            Self.debugPlayed = true
+            Task { @MainActor [weak self] in
+                for _ in 0..<60 where LiveTVDataStore.shared.channels.isEmpty { try? await Task.sleep(for: .milliseconds(500)) }
+                try? await Task.sleep(for: .seconds(3))
+                guard let self, let channel = LiveTVDataStore.shared.channels.first(where: {
+                    $0.name.localizedCaseInsensitiveContains(name) }) else { return }
+                self.play(channel)
+                if let moves = ProcessInfo.processInfo.environment["RIVULET_AUTOPLAY_MOVES"] {
+                    try? await Task.sleep(for: .seconds(10))
+                    // The List leaves the window under a full-screen player; the scene's window stays.
+                    let window = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow
+                    if let window { await DebugFocusDriver.run(moves, in: window) }
+                }
+            }
+        }
+        #endif
     }
 
     override func viewWillDisappear(_ animated: Bool) {

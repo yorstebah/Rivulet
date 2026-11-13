@@ -1140,6 +1140,16 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         syncSubtitleOverlay(animated: true)
         setNeedsFocusUpdate()
         updateFocusIfNeeded()
+        #if DEBUG
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.view.window else { return }
+            let focused = UIFocusSystem.focusSystem(for: window)?.focusedItem
+            print("[LiveFocus] rail hidden, focus=\(focused.map { String(describing: type(of: $0)) } ?? "none") catcher ok=\(focused === self.focusCatcher)")
+            if focused !== self.focusCatcher {
+                print("[LiveFocus] \(UIFocusDebugger.checkFocusability(for: self.focusCatcher))")
+            }
+        }
+        #endif
     }
 
     /// The bar takes focus only while the rail is up with nothing over it.
