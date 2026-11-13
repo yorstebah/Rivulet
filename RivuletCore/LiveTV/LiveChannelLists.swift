@@ -25,8 +25,9 @@ struct LiveChannelList: Codable, Hashable, Identifiable {
     var isSmart: Bool { rules != nil }
 
     /// The list's channels in `lineup`: a smart list's matches in lineup order, else its own in its order.
-    func channels(in lineup: [UnifiedChannel], epg: [String: [UnifiedProgram]] = [:]) -> [UnifiedChannel] {
-        if let rules { return rules.channels(in: lineup, epg: epg) }
+    func channels(in lineup: [UnifiedChannel], epg: [String: [UnifiedProgram]] = [:],
+                  versions: LiveSmartRules.Versions? = nil) -> [UnifiedChannel] {
+        if let rules { return rules.channels(in: lineup, epg: epg, versions: versions) }
         let byId = Dictionary(lineup.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return channelIds.compactMap { byId[$0] }
     }
@@ -71,7 +72,7 @@ final class LiveChannelListStore: ObservableObject {
     func createList(named name: String, with channelId: String) -> LiveChannelList? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let list = LiveChannelList(id: UUID().uuidString, name: trimmed, channelIds: [channelId])
+        let list = LiveChannelList(id: UUID().uuidString, name: uniqueName(trimmed), channelIds: [channelId])
         lists.append(list)
         saveLists()
         return list
@@ -82,7 +83,7 @@ final class LiveChannelListStore: ObservableObject {
     func createSmartList(named name: String, rules: LiveSmartRules) -> LiveChannelList? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !rules.isEmpty else { return nil }
-        let list = LiveChannelList(id: UUID().uuidString, name: trimmed, channelIds: [], rules: rules)
+        let list = LiveChannelList(id: UUID().uuidString, name: uniqueName(trimmed), channelIds: [], rules: rules)
         lists.append(list)
         saveLists()
         return list
@@ -98,8 +99,18 @@ final class LiveChannelListStore: ObservableObject {
     func rename(_ listId: String, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let index = lists.firstIndex(where: { $0.id == listId }) else { return }
-        lists[index].name = trimmed
+        lists[index].name = uniqueName(trimmed, excluding: listId)
         saveLists()
+    }
+
+    /// The name, or "Name 2", "Name 3"… when another list has it: a list's guide tab goes by its
+    /// name, so two lists sharing one would share a tab.
+    func uniqueName(_ name: String, excluding listId: String? = nil) -> String {
+        let taken = Set(lists.filter { $0.id != listId }.map { $0.name.lowercased() })
+        guard taken.contains(name.lowercased()) else { return name }
+        var number = 2
+        while taken.contains("\(name) \(number)".lowercased()) { number += 1 }
+        return "\(name) \(number)"
     }
 
     func delete(_ listId: String) {
@@ -117,6 +128,9 @@ final class LiveChannelListStore: ObservableObject {
         }
         saveLists()
     }
+
+    /// Whether a guide change can change any list's channels (a smart list with a genre rule).
+    var listsReadGuide: Bool { lists.contains { $0.rules?.readsGuide == true } }
 
     func list(_ listId: String) -> LiveChannelList? {
         lists.first { $0.id == listId }

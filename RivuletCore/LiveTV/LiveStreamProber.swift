@@ -26,6 +26,8 @@ final class LiveStreamProber {
     /// Channels that gave nothing this session; not asked again until relaunch.
     private var failed: Set<String> = []
     private var loop: Task<Void, Never>?
+    /// Which loop is the current one.
+    private var generation = 0
     private var canRun: () -> Bool = { false }
     private let store: LiveStreamQualityStore
     private let fetch: @Sendable (URL, [String: String]) async -> StreamHeaderProbe.Result?
@@ -46,18 +48,26 @@ final class LiveStreamProber {
                 && store.quality(for: channel.id)?.height == nil && !failed.contains(channel.id)
         }
         guard loop == nil, !queue.isEmpty else { return }
+        generation += 1
+        let mine = generation
         loop = Task { [weak self] in
             await self?.run()
-            self?.loop = nil
+            // Only its own: a stopped loop finishing late must not forget a newer one,
+            // or the next probe would start a second loop beside it.
+            if self?.generation == mine { self?.loop = nil }
         }
     }
 
     /// Stops now, a stream in flight included: something is about to play.
     func stop() {
         queue = []
+        generation += 1
         loop?.cancel()
         loop = nil
     }
+
+    /// Whether a loop is running; for tests.
+    var isRunning: Bool { loop != nil }
 
     private func run() async {
         while !Task.isCancelled, canRun(), !queue.isEmpty {

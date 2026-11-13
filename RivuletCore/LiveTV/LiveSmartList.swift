@@ -69,17 +69,28 @@ struct LiveSmartRules: Codable, Hashable {
         }
     }
 
-    /// The channels that match, in lineup order. No rules match nothing.
-    func channels(in lineup: [UnifiedChannel], epg: [String: [UnifiedProgram]] = [:]) -> [UnifiedChannel] {
-        indices(in: lineup, epg: epg).map { lineup[$0] }
+    /// The store's change counters (`LiveTVDataStore.lineupVersions`): matches are kept per value.
+    struct Versions: Hashable {
+        let channels: Int
+        let epg: Int
     }
 
-    /// The positions in `lineup` that match. Kept until the lineup or guide changes: the List
-    /// layout and the guide ask on every refresh, and a large lineup takes a moment to match.
-    func indices(in lineup: [UnifiedChannel], epg: [String: [UnifiedProgram]] = [:]) -> [Int] {
+    /// The channels that match, in lineup order. No rules match nothing.
+    func channels(in lineup: [UnifiedChannel], epg: [String: [UnifiedProgram]] = [:],
+                  versions: Versions? = nil) -> [UnifiedChannel] {
+        indices(in: lineup, epg: epg, versions: versions).map { lineup[$0] }
+    }
+
+    /// The positions in `lineup` that match. With `versions`, kept until the lineup (or, for a
+    /// genre rule, the guide) changes: the List and the guide ask on every refresh, and a large
+    /// lineup takes a moment to match. Without, matched afresh.
+    func indices(in lineup: [UnifiedChannel], epg: [String: [UnifiedProgram]] = [:],
+                 versions: Versions? = nil) -> [Int] {
         guard !isEmpty else { return [] }
-        let key = MatchKey(rules: self, count: lineup.count, first: lineup.first?.id, last: lineup.last?.id,
-                           guide: genres.isEmpty ? 0 : epg.count)
+        guard let versions else { return match(lineup, epg: epg) }
+        // The lineup's ends and size tell a source-filtered lineup from the whole one.
+        let key = MatchKey(rules: self, channels: versions.channels, epg: genres.isEmpty ? 0 : versions.epg,
+                           count: lineup.count, first: lineup.first?.id, last: lineup.last?.id)
         if let known = Self.matches[key] { return known }
         let found = match(lineup, epg: epg)
         if Self.matches.count > 64 { Self.matches.removeAll() }
@@ -87,12 +98,16 @@ struct LiveSmartRules: Codable, Hashable {
         return found
     }
 
+    /// Whether a guide change can change the matches.
+    var readsGuide: Bool { !genres.isEmpty }
+
     private struct MatchKey: Hashable {
         let rules: LiveSmartRules
+        let channels: Int
+        let epg: Int
         let count: Int
         let first: String?
         let last: String?
-        let guide: Int
     }
     private static var matches: [MatchKey: [Int]] = [:]
 

@@ -43,10 +43,11 @@ final class IOSLivePlayback: ObservableObject, IOSPlaybackSession {
         windowSeeker.onChange = { [weak self] in self?.objectWillChange.send() }
         // The channel's picture and sound, for the channel lists (`LiveStreamQualityStore`), once it
         // plays: a switch clears the size, so the old channel's sound never lands on the new one.
-        Publishers.CombineLatest3(player.$videoSize, player.$audioTracks, player.$currentAudioTrackId)
+        // Playing is an input too: tracks that settled before it must still be noted.
+        Publishers.CombineLatest4(player.$videoSize, player.$audioTracks, player.$currentAudioTrackId, player.$state)
             .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
-            .sink { [weak self] size, audio, audioId in
-                guard let self, self.player.state == .playing else { return }
+            .sink { [weak self] size, audio, audioId, state in
+                guard let self, state == .playing, size.height > 0 || !audio.isEmpty else { return }
                 let track = audio.first { $0.id == audioId } ?? audio.first { $0.isDefault } ?? audio.first
                 LiveStreamQualityStore.shared.record(channelId: self.channel.id,
                                                      height: size.height > 0 ? Int(size.height.rounded()) : nil,

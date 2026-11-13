@@ -15,20 +15,23 @@ import UIKit
 
 @MainActor
 enum LiveChannelPresenter {
+    /// `sourceIdFilter`: the source a page shows (the List's sidebar entry), which multiview keeps.
+    /// `onDismiss`: the channel on screen when Back ended it, for the page to focus.
     static func play(_ channel: UnifiedChannel, from presenter: UIViewController,
                      adopting session: LiveTVSessionHandoff? = nil, animated: Bool = true,
-                     onDismiss: ((UnifiedChannel) -> Void)? = nil) {
+                     sourceIdFilter: String? = nil, onDismiss: ((UnifiedChannel) -> Void)? = nil) {
         let player = LiveTVAetherPlayerViewController(channel: channel, adopting: session)
         player.modalPresentationStyle = .fullScreen
         player.onOpenMultiview = { [weak presenter] session in
             guard let presenter else { return }
-            presentMultiview(adopting: session, adding: nil, from: presenter, fromPlayer: true, onDismiss: onDismiss)
+            presentMultiview(adopting: session, adding: nil, from: presenter, fromPlayer: true,
+                             sourceIdFilter: sourceIdFilter, onDismiss: onDismiss)
         }
         player.onWatchWithScores = { [weak presenter, weak player] in
             player?.openMultiview { session in
                 guard let presenter else { return }
                 presentMultiview(adopting: session, adding: nil, from: presenter, fromPlayer: true, scores: true,
-                                 onDismiss: onDismiss)
+                                 sourceIdFilter: sourceIdFilter, onDismiss: onDismiss)
             }
         }
         if let onDismiss { player.onDismiss = onDismiss }
@@ -39,29 +42,32 @@ enum LiveChannelPresenter {
     /// multiview takes over its picture (see `entersFromFullScreen`).
     static func presentMultiview(adopting session: LiveTVSessionHandoff?, adding channel: UnifiedChannel?,
                                  from presenter: UIViewController, fromPlayer: Bool = false, scores: Bool = false,
-                                 onDismiss: ((UnifiedChannel) -> Void)? = nil) {
-        let multiview = LiveMultiviewViewController(adopting: session, adding: channel, sourceIdFilter: nil)
+                                 sourceIdFilter: String? = nil, onDismiss: ((UnifiedChannel) -> Void)? = nil) {
+        let multiview = LiveMultiviewViewController(adopting: session, adding: channel, sourceIdFilter: sourceIdFilter)
         multiview.entersFromFullScreen = fromPlayer
         multiview.startsWithScores = scores
         multiview.onWatchFullScreen = { [weak presenter] session in
             guard let presenter else { return }
-            play(session.channel, from: presenter, adopting: session, animated: false, onDismiss: onDismiss)
+            play(session.channel, from: presenter, adopting: session, animated: false,
+                 sourceIdFilter: sourceIdFilter, onDismiss: onDismiss)
         }
         presenter.present(multiview, animated: !fromPlayer)
     }
 
     /// The programme menu for a channel and what it airs.
     static func presentMenu(channel: UnifiedChannel, program: UnifiedProgram?, from presenter: UIViewController,
-                            sourceFrame: CGRect?) {
+                            sourceFrame: CGRect?, sourceIdFilter: String? = nil,
+                            onDismiss: ((UnifiedChannel) -> Void)? = nil) {
         LiveProgramMenu.present(
             program: program, channel: channel, from: presenter, sourceFrame: sourceFrame,
             onWatch: { [weak presenter] channel in
                 guard let presenter else { return }
-                play(channel, from: presenter)
+                play(channel, from: presenter, sourceIdFilter: sourceIdFilter, onDismiss: onDismiss)
             },
             onMultiview: { [weak presenter] channel in
                 guard let presenter else { return }
-                presentMultiview(adopting: nil, adding: channel, from: presenter)
+                presentMultiview(adopting: nil, adding: channel, from: presenter,
+                                 sourceIdFilter: sourceIdFilter, onDismiss: onDismiss)
             })
     }
 }

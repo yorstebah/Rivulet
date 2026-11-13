@@ -19,12 +19,25 @@ class LiveTVDataStore: ObservableObject {
     // MARK: - Published State
 
     /// All channels from all sources, merged and sorted
-    @Published var channels: [UnifiedChannel] = []
+    @Published var channels: [UnifiedChannel] = [] {
+        didSet { channelsVersion &+= 1 }
+    }
 
     /// Current EPG data (channelId -> programs)
     @Published var epg: [String: [UnifiedProgram]] = [:] {
-        didSet { rememberEventSlots() }
+        didSet {
+            epgVersion &+= 1
+            rememberEventSlots()
+        }
     }
+
+    /// Bumped on every change to `channels` and `epg`: what derived work (smart-list
+    /// matches) is keyed by, rather than the arrays' shape.
+    private(set) var channelsVersion = 0
+    private(set) var epgVersion = 0
+
+    /// Both versions, for `LiveSmartRules`.
+    var lineupVersions: LiveSmartRules.Versions { .init(channels: channelsVersion, epg: epgVersion) }
 
     /// Channels whose guide has carried an event slot (a pregame block or "No
     /// game scheduled"), so a guide gap on one means no game is on. Kept

@@ -106,7 +106,7 @@ struct GuideLayoutView: View {
     private var ownLists: [LiveChannelList] {
         let present = Set(sourceChannels.map(\.id))
         return channelLists.lists.filter { list in
-            list.isSmart ? !list.channels(in: sourceChannels, epg: dataStore.epg).isEmpty
+            list.isSmart ? !list.channels(in: sourceChannels, epg: dataStore.epg, versions: dataStore.lineupVersions).isEmpty
                 : list.channelIds.contains(where: present.contains)
         }
     }
@@ -157,7 +157,7 @@ struct GuideLayoutView: View {
         // One of the viewer's own lists: its channels, in its order.
         let taken = takenTabNames
         if let list = ownLists.first(where: { $0.tabTitle(taken: taken) == group }) {
-            return list.channels(in: sourceChannels, epg: dataStore.epg)
+            return list.channels(in: sourceChannels, epg: dataStore.epg, versions: dataStore.lineupVersions)
         }
         if let ids = sourceTabs[group] {
             return sourceChannels.filter { ids.contains($0.sourceId) }

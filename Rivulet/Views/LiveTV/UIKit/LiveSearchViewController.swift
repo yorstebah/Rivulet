@@ -140,35 +140,14 @@ final class LiveSearchViewController: UIViewController {
     // MARK: - Actions
 
     /// Full screen, as from the List: no corner player here, so Back ends the channel.
-    private func play(_ channel: UnifiedChannel, adopting session: LiveTVSessionHandoff? = nil, animated: Bool = true) {
-        let player = LiveTVAetherPlayerViewController(channel: channel, adopting: session)
-        player.modalPresentationStyle = .fullScreen
-        player.onOpenMultiview = { [weak self] session in
-            self?.presentMultiview(adopting: session, adding: nil, fromPlayer: true)
-        }
-        player.onWatchWithScores = { [weak self, weak player] in
-            player?.openMultiview { self?.presentMultiview(adopting: $0, adding: nil, fromPlayer: true, scores: true) }
-        }
+    private func play(_ channel: UnifiedChannel) {
         preferredHalf = .results
-        present(player, animated: animated)
-    }
-
-    private func presentMultiview(adopting session: LiveTVSessionHandoff?, adding channel: UnifiedChannel?,
-                                  fromPlayer: Bool = false, scores: Bool = false) {
-        let multiview = LiveMultiviewViewController(adopting: session, adding: channel, sourceIdFilter: nil)
-        multiview.entersFromFullScreen = fromPlayer
-        multiview.startsWithScores = scores
-        multiview.onWatchFullScreen = { [weak self] session in
-            self?.play(session.channel, adopting: session, animated: false)
-        }
-        present(multiview, animated: !fromPlayer)
+        LiveChannelPresenter.play(channel, from: self)
     }
 
     private func presentMenu(_ channel: UnifiedChannel, program: UnifiedProgram?, frame: CGRect?) {
-        LiveProgramMenu.present(
-            program: program, channel: channel, from: self, sourceFrame: frame,
-            onWatch: { [weak self] channel in self?.play(channel) },
-            onMultiview: { [weak self] channel in self?.presentMultiview(adopting: nil, adding: channel) })
+        preferredHalf = .results
+        LiveChannelPresenter.presentMenu(channel: channel, program: program, from: self, sourceFrame: frame)
     }
 
     // MARK: - Keyboard and results
@@ -320,7 +299,18 @@ final class LiveSearchResultsViewController: UIViewController, UICollectionViewD
                 for hit in found.onNow { channelsById["p|\(hit.channel.id)"] = hit.channel }
             }
         }
-        dataSource.applySnapshotUsingReloadData(snapshot)
+        // The index is rebuilt each minute and as the guide fills, which runs the search again:
+        // the same results refresh their rows in place, and changed ones are diffed, so the
+        // focused row and the scroll stay where the viewer is.
+        let current = dataSource.snapshot()
+        if current.sectionIdentifiers == snapshot.sectionIdentifiers,
+           current.itemIdentifiers == snapshot.itemIdentifiers {
+            var refreshed = current
+            refreshed.reconfigureItems(current.itemIdentifiers)
+            dataSource.apply(refreshed, animatingDifferences: false)
+        } else {
+            dataSource.apply(snapshot, animatingDifferences: false)
+        }
         if found == nil {
             messageLabel.text = String(localized: "Search for a channel by name or number, or for what is on now.")
         } else if found?.isEmpty == true {

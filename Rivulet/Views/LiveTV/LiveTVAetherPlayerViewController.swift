@@ -216,6 +216,9 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     private let focusCatcher = FocusCatcherView()
     /// The rail shows once as each channel's picture first appears.
     private var didShowRailOnJoin = false
+    /// This channel's picture is up: until then the reused player still holds the last
+    /// channel's tracks, which must not be noted as this one's quality.
+    private var hasPresentedThisChannel = false
     /// The viewer paused this channel since it started, so a jump on resume needs a word.
     private var pausedSinceJoin = false
     /// The guide over the playing channel (Right), while it is open.
@@ -407,6 +410,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         loadingSpinner.startAnimating()
         isUserPaused = false
         didShowRailOnJoin = false
+        hasPresentedThisChannel = false
         pausedSinceJoin = false
 
         // Sticky per-channel subtitle delay (OSD stepper). Re-read per channel:
@@ -476,6 +480,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
             .filter { $0 }
             .sink { [weak self] _ in
                 guard let self else { return }
+                self.hasPresentedThisChannel = true
                 self.loadingSpinner.stopAnimating()
                 self.finishJoinTelemetry { $0.joined(codec: self.aetherPlayer?.sourceVideoCodecName) }
                 // As the TV app does on tuning: the channel and what is on, then the rail fades
@@ -513,10 +518,12 @@ final class LiveTVAetherPlayerViewController: UIViewController {
 
         // The channel's picture and sound, for the channel lists (`LiveStreamQualityStore`).
         // The size is zero on the software path; then only the sound is noted.
-        Publishers.CombineLatest3(aether.$videoSize, aether.$audioTracks, aether.$activeAudioTrackId)
+        // The picture coming up is an input too: tracks that settled before it must still be noted.
+        Publishers.CombineLatest4(aether.$videoSize, aether.$audioTracks, aether.$activeAudioTrackId,
+                                  aether.hasPresented.prepend(false))
             .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
-            .sink { [weak self] size, audio, audioId in
-                guard let self else { return }
+            .sink { [weak self] size, audio, audioId, _ in
+                guard let self, self.hasPresentedThisChannel else { return }
                 let track = audio.first { $0.id == audioId } ?? audio.first { $0.isDefault } ?? audio.first
                 LiveStreamQualityStore.shared.record(channelId: self.channel.id,
                                                      height: size.height > 0 ? Int(size.height.rounded()) : nil,

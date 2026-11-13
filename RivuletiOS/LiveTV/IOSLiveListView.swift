@@ -30,7 +30,7 @@ struct IOSLiveListView: View {
     @AppStorage("iosLiveListCategory") private var rememberedId = ""
     @State private var model = LiveCategoryList.build(LiveCategoryList.Input(channels: []))
     @State private var selectedId: String?
-    @State private var query = ""
+    @StateObject private var searcher = LiveChannelSearcher()
 
     private var isPicker: Bool { if case .picker = mode { true } else { false } }
     private var currentId: String? { if case .picker(let current) = mode { current.id } else { nil } }
@@ -38,15 +38,18 @@ struct IOSLiveListView: View {
 
     /// What the column depends on; the model is rebuilt only when it changes.
     private var modelKey: String {
-        "\(store.channels.count)|\(store.channels.first?.id ?? "")|\(store.favoriteIds.hashValue)|"
-            + "\(store.recentChannelIds.first ?? "")|\(lists.lists.hashValue)|\(lists.pinnedCategoryKeys.hashValue)|"
-            + "\(store.epg.count)"
+        // The lineup by its change counter (a regroup keeps its size), the guide only when a
+        // smart list reads it, and every other input of `liveCategoryList`.
+        "\(store.channelsVersion)|\(lists.listsReadGuide ? store.epgVersion : 0)|\(store.favoriteIds.hashValue)|"
+            + "\(store.unfavoritedIds.hashValue)|\(store.recentChannelIds.hashValue)|"
+            + "\(store.sources.map { "\($0.id)\($0.displayName)" }.hashValue)|"
+            + "\(lists.lists.hashValue)|\(lists.pinnedCategoryKeys.hashValue)"
     }
 
     var body: some View {
         // One search field for every state: swapping it as the query fills would drop the keyboard.
         content
-            .searchable(text: $query, prompt: "Channels")
+            .searchable(text: $searcher.query, prompt: "Channels")
             .navigationDestination(for: IOSLiveCategoryRoute.self) { route in
                 if let category = model.category(route.id) { channelColumn(category) }
             }
@@ -57,7 +60,7 @@ struct IOSLiveListView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !query.isEmpty {
+        if !searcher.query.isEmpty {
             searchResults
         } else if twoColumns {
             HStack(spacing: 0) {
@@ -123,18 +126,15 @@ struct IOSLiveListView: View {
     }
 
     private var searchResults: some View {
-        IOSLiveChannelColumn(channels: matches, currentId: currentId, onPick: pick, menu: menu, canProbe: canProbe)
+        IOSLiveChannelColumn(channels: searcher.results, currentId: currentId, onPick: pick, menu: menu,
+                             canProbe: canProbe)
             .overlay {
-                if matches.isEmpty { ContentUnavailableView.search(text: query) }
+                if searcher.isSearching, searcher.results.isEmpty {
+                    ProgressView()
+                } else if searcher.results.isEmpty {
+                    ContentUnavailableView.search(text: searcher.query)
+                }
             }
-    }
-
-    private var matches: [UnifiedChannel] {
-        store.channels.filter {
-            $0.displayName.localizedCaseInsensitiveContains(query)
-                || $0.channelNumber.map { String($0).hasPrefix(query) } == true
-                || store.getCurrentProgram(for: $0)?.title.localizedCaseInsensitiveContains(query) == true
-        }
     }
 
     private func pick(_ channel: UnifiedChannel) {

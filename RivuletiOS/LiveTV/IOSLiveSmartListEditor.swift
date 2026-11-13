@@ -23,7 +23,9 @@ struct IOSLiveSmartListEditor: View {
         Dictionary(store.sources.map { ($0.id, $0.displayName) }, uniquingKeysWith: { first, _ in first })
     }
 
-    private var matches: Int { draft.finalRules.channels(in: store.channels, epg: store.epg).count }
+    private var matches: Int {
+        draft.finalRules.channels(in: store.channels, epg: store.epg, versions: store.lineupVersions).count
+    }
 
     var body: some View {
         NavigationStack {

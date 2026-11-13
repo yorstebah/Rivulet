@@ -104,6 +104,8 @@ struct LiveCategoryList {
         var pinnedKeys: [String] = []
         /// The guide, for a smart list's genre rule.
         var epg: [String: [UnifiedProgram]] = [:]
+        /// The store's change counters, so smart lists are not matched again for nothing.
+        var versions: LiveSmartRules.Versions?
     }
 
     /// The column's rows in order, source headers included.
@@ -146,7 +148,7 @@ struct LiveCategoryList {
             positions: favorites.compactMap { position[$0.id] })
         // The viewer's own lists, each in the order its channels were added.
         for list in input.lists {
-            let positions = list.rules.map { $0.indices(in: lineup, epg: input.epg) }
+            let positions = list.rules.map { $0.indices(in: lineup, epg: input.epg, versions: input.versions) }
                 ?? list.channelIds.compactMap { position[$0] }
             add(.list(list.id), title: list.name, sourceId: nil, positions: positions)
         }
@@ -312,6 +314,6 @@ extension LiveTVDataStore {
             sourceIdFilter: sourceIdFilter, collapsedSourceIds: collapsedSourceIds,
             lists: LiveChannelListStore.shared.lists,
             pinnedKeys: LiveChannelListStore.shared.pinnedCategoryKeys,
-            epg: epg))
+            epg: epg, versions: lineupVersions))
     }
 }

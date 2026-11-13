@@ -118,10 +118,13 @@ final class LiveListViewController: UIViewController {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.rebuild() }
             .store(in: &cancellables)
-        // A guide update changes what rows say, never which rows there are.
+        // A guide update changes what rows say; which rows there are only through a smart
+        // list with a genre rule, which reads the guide.
         store.$epg
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in self?.refreshVisibleRows() }
+            .sink { [weak self] _ in
+                if LiveChannelListStore.shared.listsReadGuide { self?.rebuild() } else { self?.refreshVisibleRows() }
+            }
             .store(in: &cancellables)
         store.$isLoadingChannels
             .receive(on: DispatchQueue.main)
@@ -216,8 +219,8 @@ final class LiveListViewController: UIViewController {
                                ("GB+BE News", LiveSmartRules([.origin("GB"), .origin("BE"), .genre(.news)])),
                                ("Kids", LiveSmartRules([.genre(.kids)])),
                                ("word bbc", LiveSmartRules([.word("bbc")]))] {
-            let found = time("match \(label)") { rules.channels(in: lineup, epg: data.epg) }
-            _ = time("again \(label)") { rules.channels(in: lineup, epg: data.epg) }
+            let found = time("match \(label)") { rules.channels(in: lineup, epg: data.epg, versions: data.lineupVersions) }
+            _ = time("again \(label)") { rules.channels(in: lineup, epg: data.epg, versions: data.lineupVersions) }
             print("[Smart] \(label): \(found.count) e.g. \(found.prefix(6).map(\.name))")
         }
         let step: Duration = .seconds(6)
@@ -705,14 +708,10 @@ final class LiveListViewController: UIViewController {
               let id = channelData.itemIdentifier(for: indexPath),
               let channel = shownById[id] else { return }
         let frame = channelView.cellForItem(at: indexPath).map { $0.convert($0.bounds, to: nil) }
-        LiveProgramMenu.present(
-            program: nowNext(channel).current,
-            channel: channel,
-            from: self,
-            sourceFrame: frame,
-            onWatch: { [weak self] channel in self?.play(channel) },
-            onMultiview: { [weak self] channel in self?.presentMultiview(adopting: nil, adding: channel) }
-        )
+        stopProbing()
+        LiveChannelPresenter.presentMenu(channel: channel, program: nowNext(channel).current, from: self,
+                                         sourceFrame: frame, sourceIdFilter: sourceIdFilter,
+                                         onDismiss: focusAfterPlayer)
     }
 
     /// Held Select on a category: pin a group to the top, rename or delete one
@@ -756,36 +755,14 @@ final class LiveListViewController: UIViewController {
     /// Full screen on the glass rail, as from What's On. No corner player
     /// here, so Back ends the channel; focus comes back to the channel that
     /// was on screen, which may have changed in the player.
-    private func play(_ channel: UnifiedChannel, adopting session: LiveTVSessionHandoff? = nil, animated: Bool = true) {
+    private func play(_ channel: UnifiedChannel) {
         // The provider may allow one stream: nothing is measured while one plays.
         stopProbing()
-        let player = LiveTVAetherPlayerViewController(channel: channel, adopting: session)
-        player.modalPresentationStyle = .fullScreen
-        player.onOpenMultiview = { [weak self] session in
-            self?.presentMultiview(adopting: session, adding: nil, fromPlayer: true)
-        }
-        player.onWatchWithScores = { [weak self, weak player] in
-            player?.openMultiview { self?.presentMultiview(adopting: $0, adding: nil, fromPlayer: true, scores: true) }
-        }
-        player.onDismiss = { [weak self] channel in
-            DispatchQueue.main.async { self?.focusChannel(channel.id) }
-        }
-        present(player, animated: animated)
+        LiveChannelPresenter.play(channel, from: self, sourceIdFilter: sourceIdFilter, onDismiss: focusAfterPlayer)
     }
 
-    /// `fromPlayer`: the full-screen player just closed without animation, and
-    /// multiview takes over its picture (see `entersFromFullScreen`).
-    private func presentMultiview(adopting session: LiveTVSessionHandoff?, adding channel: UnifiedChannel?,
-                                  fromPlayer: Bool = false, scores: Bool = false) {
-        stopProbing()
-        let multiview = LiveMultiviewViewController(adopting: session, adding: channel,
-                                                    sourceIdFilter: sourceIdFilter)
-        multiview.entersFromFullScreen = fromPlayer
-        multiview.startsWithScores = scores
-        multiview.onWatchFullScreen = { [weak self] session in
-            self?.play(session.channel, adopting: session, animated: false)
-        }
-        present(multiview, animated: !fromPlayer)
+    private var focusAfterPlayer: (UnifiedChannel) -> Void {
+        { [weak self] channel in DispatchQueue.main.async { self?.focusChannel(channel.id) } }
     }
 }
 

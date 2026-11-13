@@ -143,4 +143,28 @@ final class LiveSmartListTests: XCTestCase {
         XCTAssertEqual(store.list(id)?.name, "Dutch")
         XCTAssertEqual(store.list(id)?.rules?.rules, [.origin("NL")])
     }
+
+    func test_matchesAreKeptPerVersion_andARegroupWithTheSameShapeIsSeen() {
+        let rules = LiveSmartRules([.origin("NL")])
+        let v1 = LiveSmartRules.Versions(channels: 101, epg: 0)
+        XCTAssertEqual(rules.channels(in: lineup, versions: v1).map(\.id), ["x:1", "x:2"])
+        // Same size, same ends, a middle channel regrouped: a new lineup version, a fresh match.
+        lineup[1] = ch("2", "┃BE┃ ESPN 1 HD", group: "| BE | SPORT")
+        XCTAssertEqual(rules.channels(in: lineup, versions: LiveSmartRules.Versions(channels: 102, epg: 0)).map(\.id),
+                       ["x:1"])
+    }
+
+    func test_listNames_stayUnique() throws {
+        let suite = "LiveSmartListNameTests"
+        UserDefaults().removePersistentDomain(forName: suite)
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let store = LiveChannelListStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suite)))
+        let first = try XCTUnwrap(store.createSmartList(named: "Sports", rules: LiveSmartRules([.genre(.sports)])))
+        let second = try XCTUnwrap(store.createList(named: "sports", with: "x:1"))
+        XCTAssertEqual(second.name, "sports 2")
+        store.rename(first.id, to: "Sports")
+        XCTAssertEqual(store.list(first.id)?.name, "Sports")
+        store.rename(second.id, to: "Sports")
+        XCTAssertEqual(store.list(second.id)?.name, "Sports 2")
+    }
 }

@@ -139,7 +139,7 @@ struct MacLiveTVView: View {
             return favorites.isEmpty ? store.channels : favorites
         }
         if let list = LiveChannelList.forFilter(guideFilter, store: channelLists) {
-            let channels = list.channels(in: store.channels, epg: store.epg)
+            let channels = list.channels(in: store.channels, epg: store.epg, versions: store.lineupVersions)
             return channels.isEmpty ? store.channels : channels
         }
         guard !guideFilter.isEmpty else { return store.channels }

@@ -10,6 +10,7 @@
 //  are ignored. Data only; each app draws the results its own way.
 //
 
+import Combine
 import Foundation
 
 nonisolated enum LiveChannelSearch {
@@ -102,5 +103,73 @@ nonisolated enum LiveChannelSearch {
 
         return Results(channels: ranked.prefix(channelLimit).map(\.channel),
                        onNow: onNow.prefix(programLimit).map { ($0.channel, $0.program) })
+    }
+}
+
+/// A search field's channel results on iOS and the Mac, through the same index and ranking as
+/// tvOS: the index is built off the main thread once per lineup and guide, and typing runs one
+/// search per pause rather than per letter. Channels that match, then those airing a match.
+@MainActor
+final class LiveChannelSearcher: ObservableObject {
+    @Published var query = "" {
+        didSet { if query != oldValue { run() } }
+    }
+    @Published private(set) var results: [UnifiedChannel] = []
+    /// A search is waiting on the index or the pause.
+    @Published private(set) var isSearching = false
+
+    private let store: LiveTVDataStore
+    private var index: LiveChannelSearch.Index?
+    private var indexedVersions: LiveSmartRules.Versions?
+    /// The lineup and guide the index in flight is built from.
+    private var buildingVersions: LiveSmartRules.Versions?
+    private var indexTask: Task<Void, Never>?
+    private var searchTask: Task<Void, Never>?
+
+    init(store: LiveTVDataStore = .shared) {
+        self.store = store
+    }
+
+    private func run() {
+        searchTask?.cancel()
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            results = []
+            isSearching = false
+            return
+        }
+        isSearching = true
+        guard let index, indexedVersions == store.lineupVersions else { return buildIndex() }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            let found = await Task.detached(priority: .userInitiated) {
+                LiveChannelSearch.search(trimmed, in: index)
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            var seen = Set(found.channels.map(\.id))
+            self.results = found.channels + found.onNow.map(\.channel).filter { seen.insert($0.id).inserted }
+            self.isSearching = false
+        }
+    }
+
+    private func buildIndex() {
+        let versions = store.lineupVersions
+        // Already building this one: the search runs when it lands, not on every keystroke.
+        guard buildingVersions != versions else { return }
+        indexTask?.cancel()
+        buildingVersions = versions
+        let channels = store.channels, epg = store.epg
+        indexTask = Task { [weak self] in
+            let built = await Task.detached(priority: .userInitiated) {
+                LiveChannelSearch.Index(channels, epg: epg, now: Date())
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            self.index = built
+            self.indexedVersions = versions
+            self.buildingVersions = nil
+            self.indexTask = nil
+            self.run()
+        }
     }
 }

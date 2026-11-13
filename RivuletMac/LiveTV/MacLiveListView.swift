@@ -28,15 +28,18 @@ struct MacLiveListView: View {
     @AppStorage("macLiveListCategory") private var rememberedId = ""
     @State private var model = LiveCategoryList.build(LiveCategoryList.Input(channels: []))
     @State private var selectedId: String?
-    @State private var query = ""
+    @StateObject private var searcher = LiveChannelSearcher()
 
     private var isPicker: Bool { if case .picker = mode { true } else { false } }
     private var currentId: String? { if case .picker(let current) = mode { current.id } else { nil } }
 
     private var modelKey: String {
-        "\(store.channels.count)|\(store.channels.first?.id ?? "")|\(store.favoriteIds.hashValue)|"
-            + "\(store.recentChannelIds.first ?? "")|\(lists.lists.hashValue)|\(lists.pinnedCategoryKeys.hashValue)|"
-            + "\(store.epg.count)"
+        // The lineup by its change counter (a regroup keeps its size), the guide only when a
+        // smart list reads it, and every other input of `liveCategoryList`.
+        "\(store.channelsVersion)|\(lists.listsReadGuide ? store.epgVersion : 0)|\(store.favoriteIds.hashValue)|"
+            + "\(store.unfavoritedIds.hashValue)|\(store.recentChannelIds.hashValue)|"
+            + "\(store.sources.map { "\($0.id)\($0.displayName)" }.hashValue)|"
+            + "\(lists.lists.hashValue)|\(lists.pinnedCategoryKeys.hashValue)"
     }
 
     var body: some View {
@@ -61,31 +64,27 @@ struct MacLiveListView: View {
             .frame(width: isPicker ? 240 : 280)
             Divider()
             VStack(spacing: 0) {
-                TextField("Search Channels", text: $query)
+                TextField("Search Channels", text: $searcher.query)
                     .textFieldStyle(.roundedBorder)
                     .padding(10)
                 MacLiveChannelColumn(channels: shownChannels, currentId: currentId, onPick: pick,
                                      menu: menu, canProbe: canProbe)
                     .overlay {
-                        if !query.isEmpty, shownChannels.isEmpty { ContentUnavailableView.search(text: query) }
+                        if !searcher.query.isEmpty, shownChannels.isEmpty {
+                            if searcher.isSearching { ProgressView() } else { ContentUnavailableView.search(text: searcher.query) }
+                        }
                     }
             }
         }
         .frame(width: isPicker ? 680 : nil, height: isPicker ? 520 : nil)
         .task(id: modelKey) { rebuild() }
-        .onChange(of: selectedId) { _, id in if let id { rememberedId = id; query = "" } }
+        .onChange(of: selectedId) { _, id in if let id { rememberedId = id; searcher.query = "" } }
         .onDisappear { LiveStreamProber.shared.stop() }
     }
 
     /// The category's channels, or every channel matching the search.
     private var shownChannels: [UnifiedChannel] {
-        guard query.isEmpty else {
-            return store.channels.filter {
-                $0.displayName.localizedCaseInsensitiveContains(query)
-                    || $0.channelNumber.map { String($0).hasPrefix(query) } == true
-                    || store.getCurrentProgram(for: $0)?.title.localizedCaseInsensitiveContains(query) == true
-            }
-        }
+        guard searcher.query.isEmpty else { return searcher.results }
         return selectedId.map(model.channels(in:)) ?? []
     }
 
