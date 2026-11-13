@@ -180,3 +180,65 @@ struct LiveSmartRules: Codable, Hashable {
         return title(of: rule, sourceNames: sourceNames)
     }
 }
+
+/// A smart list being made or changed in the iOS and Mac editor: the rules as switches, the
+/// words as one comma-separated field, and a name that defaults to the first rule's.
+struct LiveSmartListDraft {
+    let listId: String?
+    var name: String
+    var rules: LiveSmartRules
+    var wordsText: String
+
+    init(listId: String?, store: LiveChannelListStore = .shared) {
+        self.listId = listId
+        let list = listId.flatMap(store.list)
+        name = list?.name ?? ""
+        var rules = list?.rules ?? LiveSmartRules()
+        wordsText = rules.words.joined(separator: ", ")
+        rules.words = []
+        self.rules = rules
+    }
+
+    /// The rules with the words field read in.
+    var finalRules: LiveSmartRules {
+        var result = rules
+        for word in wordsText.split(separator: ",") { result.add(.word(String(word))) }
+        return result
+    }
+
+    var canSave: Bool { !finalRules.isEmpty }
+
+    func isOn(_ rule: LiveSmartRules.Rule) -> Bool { rules.contains(rule) }
+
+    mutating func set(_ rule: LiveSmartRules.Rule, on: Bool) {
+        if on { rules.add(rule) } else { rules.remove(rule) }
+    }
+
+    /// Saves and returns the list's id; a blank name takes the first rule's.
+    @discardableResult
+    func save(store: LiveChannelListStore = .shared, sourceNames: [String: String] = [:]) -> String? {
+        let rules = finalRules
+        guard let first = rules.rules.first else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = trimmed.isEmpty ? LiveSmartRules.suggestedName(for: first, sourceNames: sourceNames) : trimmed
+        if let listId {
+            store.rename(listId, to: title)
+            store.setRules(rules, for: listId)
+            return listId
+        }
+        return store.createSmartList(named: title, rules: rules)?.id
+    }
+}
+
+extension LiveChannelList {
+    /// A guide filter's value for a list, beside the groups' titles.
+    static let filterPrefix = "list:"
+
+    var filterTag: String { Self.filterPrefix + id }
+
+    /// The list a guide filter names, if it names one.
+    static func forFilter(_ filter: String, store: LiveChannelListStore = .shared) -> LiveChannelList? {
+        guard filter.hasPrefix(filterPrefix) else { return nil }
+        return store.list(String(filter.dropFirst(filterPrefix.count)))
+    }
+}

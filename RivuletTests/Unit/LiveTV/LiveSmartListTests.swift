@@ -116,4 +116,31 @@ final class LiveSmartListTests: XCTestCase {
         XCTAssertEqual(list.channels(in: "list|s").map(\.id), ["x:2", "x:3"])
         XCTAssertNil(list.category("list|e"))
     }
+
+    func test_draft_newList_takesTheFirstRulesName_andReadsTheWords() throws {
+        let suite = "LiveSmartListDraftTests"
+        UserDefaults().removePersistentDomain(forName: suite)
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let store = LiveChannelListStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suite)))
+        var draft = LiveSmartListDraft(listId: nil, store: store)
+        XCTAssertFalse(draft.canSave)
+        draft.set(.genre(.news), on: true)
+        draft.wordsText = "bbc, , cnn "
+        let id = try XCTUnwrap(draft.save(store: store))
+        let list = try XCTUnwrap(store.list(id))
+        XCTAssertEqual(list.name, LiveGenre.news.title)
+        XCTAssertEqual(list.rules?.rules, [.genre(.news), .word("bbc"), .word("cnn")])
+        XCTAssertEqual(LiveChannelList.forFilter(list.filterTag, store: store)?.id, id)
+        XCTAssertNil(LiveChannelList.forFilter("NEWS", store: store))
+
+        var edit = LiveSmartListDraft(listId: id, store: store)
+        XCTAssertEqual(edit.wordsText, "bbc, cnn")
+        edit.set(.genre(.news), on: false)
+        edit.set(.origin("NL"), on: true)
+        edit.wordsText = ""
+        edit.name = "Dutch"
+        edit.save(store: store)
+        XCTAssertEqual(store.list(id)?.name, "Dutch")
+        XCTAssertEqual(store.list(id)?.rules?.rules, [.origin("NL")])
+    }
 }

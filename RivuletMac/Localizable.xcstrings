@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Africa" : {},
+    "Any" : {},
+    "Asia" : {},
+    "Choices of one kind widen the list; different kinds narrow it." : {},
+    "Choose at least one rule." : {},
+    "Country or Language" : {},
+    "Delete Smart List" : {},
+    "Delete Smart List?" : {},
+    "Edit Smart List" : {},
+    "Edit “%@”…" : {},
+    "Ex-Yugoslav" : {},
+    "International" : {},
     "Map" : {
       "localizations" : {
         "de" : {
@@ -18,6 +30,11 @@
       }
     },
     "Movies and TV Shows" : {},
+    "Multilingual" : {},
+    "Name Contains" : {},
+    "Name Contains “%@”" : {},
+    "New Smart List" : {},
+    "New Smart List…" : {},
     "On This Day" : {
       "localizations" : {
         "de" : {
@@ -34,6 +51,7 @@
         }
       }
     },
+    "Original Version" : {},
     "Photos from %@" : {
       "localizations" : {
         "de" : {
@@ -50,6 +68,7 @@
         }
       }
     },
+    "Save" : {},
     "Slideshow" : {
       "localizations" : {
         "de" : {
@@ -82,6 +101,7 @@
         }
       }
     },
+    "Source" : {},
     "TMDB API Key" : {},
     "The provider's films and series appear as Movies and TV Shows libraries. With your own free key from themoviedb.org, their pages show the plot in your language, the cast with photos and more." : {},
     "Unfavorite" : {
@@ -148,6 +168,7 @@
         }
       }
     },
+    "Words, separated by commas" : {},
     "Z to A" : {
       "localizations" : {
         "de" : {

@@ -200,7 +200,6 @@ private struct MacLiveSourceDetailSheet: View {
     }
 }
 
-/// Rivulet's favorites in order: drag to reorder, Delete to remove.
 /// An Xtream source's films and series: the switch, and the TMDB key their detail pages use.
 private struct MacXtreamVODSection: View {
     let sourceId: String
@@ -230,6 +229,7 @@ private struct MacXtreamVODSection: View {
     }
 }
 
+/// Rivulet's favorites in order: drag to reorder, Delete to remove.
 private struct MacLiveFavoritesSheet: View {
     @ObservedObject private var store = LiveTVDataStore.shared
     @Environment(\.dismiss) private var dismiss
