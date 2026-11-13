@@ -550,6 +550,15 @@ final class LiveTVAetherPlayerViewController: UIViewController {
                 }
             }
             .store(in: &cancellables)
+        // The guide arriving after the channel started (just after launch): the rail
+        // names the programme instead of only the channel.
+        LiveTVDataStore.shared.$epg
+            .map { [channelId = channel.id] epg in epg[channelId]?.isEmpty == false }
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateRailContent() }
+            .store(in: &cancellables)
         // And the Record button, the moment a recording is set or cancelled.
         LiveTVDataStore.shared.$scheduledRecordings
             .receive(on: DispatchQueue.main)
