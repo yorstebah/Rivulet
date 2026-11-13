@@ -44,8 +44,14 @@ struct IOSLiveListView: View {
     }
 
     var body: some View {
+        // One search field for every state: swapping it as the query fills would drop the keyboard.
         content
+            .searchable(text: $query, prompt: "Channels")
+            .navigationDestination(for: IOSLiveCategoryRoute.self) { route in
+                if let category = model.category(route.id) { channelColumn(category) }
+            }
             .task(id: modelKey) { rebuild() }
+            .onChange(of: selectedId) { _, id in if let id, twoColumns { rememberedId = id } }
             .onDisappear { LiveStreamProber.shared.stop() }
     }
 
@@ -53,7 +59,6 @@ struct IOSLiveListView: View {
     private var content: some View {
         if !query.isEmpty {
             searchResults
-                .searchable(text: $query, prompt: "Channels")
         } else if twoColumns {
             HStack(spacing: 0) {
                 List(selection: $selectedId) { categoryRows(linked: false) }
@@ -66,13 +71,8 @@ struct IOSLiveListView: View {
                     ContentUnavailableView("No Channels", systemImage: "list.bullet")
                 }
             }
-            .onChange(of: selectedId) { _, id in if let id { rememberedId = id } }
         } else {
             List { categoryRows(linked: true) }
-                .searchable(text: $query, prompt: "Channels")
-                .navigationDestination(for: IOSLiveCategoryRoute.self) { route in
-                    if let category = model.category(route.id) { channelColumn(category) }
-                }
         }
     }
 
