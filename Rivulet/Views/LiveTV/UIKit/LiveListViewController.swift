@@ -84,6 +84,8 @@ final class LiveListViewController: UIViewController {
     private var pendingFocus: UIFocusEnvironment?
     private var cancellables = Set<AnyCancellable>()
     private var minuteTimer: Timer?
+    /// Measures the rows on screen once they settle (`LiveStreamProber`).
+    private var probeWork: DispatchWorkItem?
     private var guideSwipe: DirectionalInputBinding?
     /// The remote gesture that brought focus into the channels. That same
     /// Right goes on to reach `pressesBegan`, and must not open the guide.
@@ -165,6 +167,11 @@ final class LiveListViewController: UIViewController {
         MenuPressInterceptor.register(self)
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopProbing()
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         MenuPressInterceptor.resign(self)
@@ -187,6 +194,7 @@ final class LiveListViewController: UIViewController {
     /// edge, which opens the sidebar). Inside, the channel's programme takes it.
     private func showGuide(_ target: LiveGuideTarget, channelId: String) {
         guard guide == nil, let makeGuide else { return }
+        stopProbing()
         let guide = makeGuide(target, channelId) { [weak self] back in self?.closeGuide(back) }
         self.guide = guide
         // Opaque, so the list never shows through where the guide draws nothing.
@@ -469,6 +477,7 @@ final class LiveListViewController: UIViewController {
             channelView.setContentOffset(CGPoint(x: 0, y: -channelView.adjustedContentInset.top), animated: false)
         }
 
+        scheduleProbe()
         let category = selectedId.flatMap { list.category($0) }
         titleLabel.text = category?.title
         countLabel.text = category.map { String(localized: "\($0.channelCount) channels") }
@@ -535,6 +544,31 @@ final class LiveListViewController: UIViewController {
         emptyLabel.isHidden = !(empty && !loading)
         titleLabel.isHidden = empty
         countLabel.isHidden = empty
+    }
+
+    // MARK: - Measuring streams
+
+    /// The rows on screen, a moment after they settle, while nothing plays here.
+    private func scheduleProbe() {
+        probeWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            let rows = self.channelView.indexPathsForVisibleItems.sorted()
+                .compactMap { self.channelData.itemIdentifier(for: $0) }
+                .compactMap { self.shownById[$0] }
+            LiveStreamProber.shared.probe(rows) { [weak self] in
+                guard let self else { return false }
+                return self.view.window != nil && self.presentedViewController == nil && self.guide == nil
+            }
+        }
+        probeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
+
+    private func stopProbing() {
+        probeWork?.cancel()
+        probeWork = nil
+        LiveStreamProber.shared.stop()
     }
 
     // MARK: - Focus
@@ -637,6 +671,8 @@ final class LiveListViewController: UIViewController {
     /// here, so Back ends the channel; focus comes back to the channel that
     /// was on screen, which may have changed in the player.
     private func play(_ channel: UnifiedChannel, adopting session: LiveTVSessionHandoff? = nil, animated: Bool = true) {
+        // The provider may allow one stream: nothing is measured while one plays.
+        stopProbing()
         let player = LiveTVAetherPlayerViewController(channel: channel, adopting: session)
         player.modalPresentationStyle = .fullScreen
         player.onOpenMultiview = { [weak self] session in
@@ -655,6 +691,7 @@ final class LiveListViewController: UIViewController {
     /// multiview takes over its picture (see `entersFromFullScreen`).
     private func presentMultiview(adopting session: LiveTVSessionHandoff?, adding channel: UnifiedChannel?,
                                   fromPlayer: Bool = false, scores: Bool = false) {
+        stopProbing()
         let multiview = LiveMultiviewViewController(adopting: session, adding: channel,
                                                     sourceIdFilter: sourceIdFilter)
         multiview.entersFromFullScreen = fromPlayer
@@ -676,6 +713,8 @@ extension LiveListViewController: UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, didUpdateFocusIn context: UICollectionViewFocusUpdateContext,
                         with coordinator: UIFocusAnimationCoordinator) {
+        // Scrolling through channels brings new rows on screen to measure.
+        if collectionView === channelView { scheduleProbe() }
         guard collectionView === categoryView,
               let indexPath = context.nextFocusedIndexPath,
               let id = categoryData.itemIdentifier(for: indexPath),
