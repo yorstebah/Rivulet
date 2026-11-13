@@ -271,7 +271,12 @@ struct TVSidebarView: View {
         }
         .task(id: authManager.hasCredentials) {
             StartupTimer.mark("TVSidebar .task entry")
-            guard authManager.hasCredentials else { return }
+            guard authManager.hasCredentials else {
+                // No Plex, so no profile gate: a link held since launch (Top Shelf, Siri) to
+                // another server's item may open now, or it would wait forever.
+                deepLinkHandler.isShellReady = true
+                return
+            }
 
             // A saved profile with no stored token of its own: nothing may load
             // until plex.tv lets it in, so resolve it now instead of deferring.
