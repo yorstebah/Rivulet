@@ -1496,6 +1496,22 @@ enum SettingsContent {
             rows.append(SettingsRowItem(id: "src_xtreamVOD", title: "Movies and TV Shows", kind: .toggle(
                 get: { XtreamVODSources.isEnabled(source.id) },
                 set: { XtreamVODSources.setEnabled($0, for: source.id) })))
+            // The viewer's own TMDB key, for films' and series' details. One for every source.
+            rows.append(SettingsRowItem(id: "src_tmdbKey", title: "TMDB API Key", kind: .textEntry(
+                value: { KeychainHelper.get(TMDBLookup.keychainKey) ?? "" },
+                placeholder: String(localized: "Optional"),
+                hint: nil,
+                suggestions: [],
+                keyboardType: .asciiCapable,
+                isSecure: true,
+                set: { key in
+                    let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty {
+                        _ = KeychainHelper.delete(TMDBLookup.keychainKey)
+                    } else {
+                        _ = KeychainHelper.set(trimmed, forKey: TMDBLookup.keychainKey)
+                    }
+                })))
         }
         // Only shown when a profile is actually set, so the common all-channels
         // source keeps the page as short as it is today.

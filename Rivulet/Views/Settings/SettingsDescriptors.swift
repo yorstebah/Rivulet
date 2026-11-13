@@ -349,6 +349,10 @@ enum SettingsDescriptorStore {
             icon: "film.stack",
             description: "The provider's films and series, as Movies and TV Shows libraries in the sidebar and on Home. Off leaves only its channels."
         ),
+        "src_tmdbKey": SettingDescriptor(
+            icon: "info.circle",
+            description: "Your own key from themoviedb.org (free, under Settings > API). With it, a film's or series' page shows the plot in your language, the cast with photos and more, where the provider says little. Leave empty to turn it off."
+        ),
         "src_showInLiveTV": SettingDescriptor(
             icon: "tv.and.mediabox",
             description: "Off hides this server's channels from Live TV. Its libraries stay."

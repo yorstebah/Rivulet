@@ -28,12 +28,15 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     /// Each title's runtime once known, for the progress reporter, which is built without a request.
     private let runtimes = OSAllocatedUnfairLock(initialState: [String: TimeInterval]())
 
+    /// TMDB details for detail pages, with the viewer's own key; tests pass their own.
+    let tmdb: TMDBLookup
     /// Where watch state is kept; tests pass their own.
     private let watchStore: @MainActor @Sendable () -> XtreamWatchProgressStore
 
     /// `sourceID` is the Live TV source's ("xtream:<hash>"), which is also a valid provider id.
     init(sourceID: String, displayName: String, account: XtreamAccount,
          cacheDirectory: URL? = XtreamVODCatalog.defaultDirectory, session: URLSession? = nil,
+         tmdb: TMDBLookup? = nil,
          watchStore: @escaping @MainActor @Sendable () -> XtreamWatchProgressStore = { .shared }) {
         self.id = sourceID
         self.displayName = displayName
@@ -41,6 +44,7 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         self.service = service
         self.catalog = XtreamVODCatalog(service: service, sourceID: sourceID, directory: cacheDirectory)
         self.watchStore = watchStore
+        self.tmdb = tmdb ?? .shared
     }
 
     // MARK: - Watch state
@@ -253,8 +257,11 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         case .series(let seriesID):
             let (series, _) = try await seriesAndInfo(seriesID)
             let episodes = try await episodes(of: seriesID)
-            return Self.detail(XtreamVODMapping.item(series, provider: id, state: state), genres: XtreamVODMapping.genres(series.genre),
-                               nextEpisode: XtreamVODMapping.nextEpisode(episodes))
+            let detail = Self.detail(XtreamVODMapping.item(series, provider: id, state: state),
+                                     genres: XtreamVODMapping.genres(series.genre),
+                                     nextEpisode: XtreamVODMapping.nextEpisode(episodes))
+            guard let found = await tmdb.title(.tv, tmdbID: nil, name: series.name, year: series.year) else { return detail }
+            return XtreamVODMapping.enriched(detail, with: found)
         case .season(let seriesID, let number):
             let (series, info) = try await seriesAndInfo(seriesID)
             guard let season = info.seasons.first(where: { $0.number == number }) else { throw MediaProviderError.notFound }
@@ -284,7 +291,9 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let listed = XtreamVODMapping.item(movie, provider: id, state: state)
         // Details are a bonus: a panel that fails `get_vod_info` still plays the film.
         guard let info = try? await info else {
-            return Self.detail(listed, sources: [Self.source(runtime: nil, container: movie.containerExtension, url: nil)])
+            let bare = Self.detail(listed, sources: [Self.source(runtime: nil, container: movie.containerExtension, url: nil)])
+            guard let found = await tmdb.title(.movie, tmdbID: nil, name: movie.name, year: movie.year) else { return bare }
+            return XtreamVODMapping.enriched(bare, with: found)
         }
         if let duration = info.duration {
             runtimes.withLock { $0[listed.ref.itemID] = duration }
@@ -303,14 +312,16 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
             genres: XtreamVODMapping.genres(info.genre),
             externalIDs: info.tmdbId.map { ["tmdb": $0] },
             libraryID: XtreamVODLibrary.movies.rawValue)
-        var detail = Self.detail(item, genres: XtreamVODMapping.genres(info.genre),
+        let detail = Self.detail(item, genres: XtreamVODMapping.genres(info.genre),
                                  cast: Self.people(info.cast, role: nil),
                                  directors: Self.people(info.director, role: String(localized: "Director")),
                                  sources: [Self.source(runtime: info.duration,
                                                        container: info.containerExtension ?? movie.containerExtension,
                                                        url: nil)])
-        if let tmdb = info.tmdbId { detail.externalIDs = ["tmdb": tmdb] }
-        return detail
+        var withID = detail
+        if let tmdbID = info.tmdbId { withID.externalIDs = ["tmdb": tmdbID] }
+        guard let found = await tmdb.title(.movie, tmdbID: info.tmdbId, name: movie.name, year: year) else { return withID }
+        return XtreamVODMapping.enriched(withID, with: found)
     }
 
     private static func people(_ names: String?, role: String?) -> [MediaPerson] {

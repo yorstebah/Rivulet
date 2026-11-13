@@ -4653,6 +4653,7 @@
       }
     },
     "Movies and TV Shows" : {},
+    "TMDB API Key" : {},
     "TV Shows" : {},
     "The Guide lists every channel against the time. What's On shows rows of what is on now, with multiview, like the Apple TV app." : {
       "localizations" : {
@@ -24893,6 +24894,7 @@
         }
       }
     },
+    "Your own key from themoviedb.org (free, under Settings > API). With it, a film's or series' page shows the plot in your language, the cast with photos and more, where the provider says little. Leave empty to turn it off." : {},
     "Your own words to mute, such as \"shut up\". Muted whenever the filter is on. A word matches only on its own, never inside another." : {
       "localizations" : {
         "de" : {

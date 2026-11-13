@@ -86,8 +86,9 @@ final class XtreamVODProviderTests: XCTestCase {
 
     private func provider() -> XtreamVODProvider {
         let store = store!
+        // No key: tests never reach TMDB, whatever the simulator's Keychain holds.
         return XtreamVODProvider(sourceID: source, displayName: "IPTV", account: account, cacheDirectory: directory,
-                                 session: session(), watchStore: { store })
+                                 session: session(), tmdb: TMDBLookup(apiKey: { nil }), watchStore: { store })
     }
 
     private func ref(_ id: XtreamVODID) -> MediaItemRef { MediaItemRef(providerID: source, itemID: id.itemID) }

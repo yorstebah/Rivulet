@@ -305,6 +305,46 @@ nonisolated enum XtreamVODMapping {
         return Array((starts + anywhere).prefix(limit))
     }
 
+    // MARK: TMDB
+
+    /// A detail page with TMDB's details where they say more: the plot (in the viewer's
+    /// language), genres, cast with photos and directors take TMDB's; year, runtime and the
+    /// backdrop fill in what the panel left out. The panel's title and poster stay: they are
+    /// what the libraries show, and the title carries the panel's copy (its language).
+    static func enriched(_ detail: MediaItemDetail, with tmdb: TMDBTitle) -> MediaItemDetail {
+        let item = detail.item
+        let enrichedItem = MediaItem(
+            ref: item.ref, kind: item.kind, title: item.title, sortTitle: item.sortTitle,
+            overview: tmdb.overview ?? item.overview, year: item.year ?? tmdb.year,
+            releaseDate: item.releaseDate, contentRating: item.contentRating,
+            runtime: item.runtime ?? tmdb.runtime, isMusic: item.isMusic,
+            parentRef: item.parentRef, grandparentRef: item.grandparentRef, seriesTitle: item.seriesTitle,
+            episodeNumber: item.episodeNumber, seasonNumber: item.seasonNumber, childProgress: item.childProgress,
+            userState: item.userState,
+            artwork: MediaArtwork(poster: item.artwork.poster ?? tmdb.posterURL,
+                                  backdrop: item.artwork.backdrop ?? tmdb.backdropURL,
+                                  thumbnail: item.artwork.thumbnail ?? tmdb.posterURL, logo: item.artwork.logo),
+            parentArtwork: item.parentArtwork, grandparentArtwork: item.grandparentArtwork,
+            versionCount: item.versionCount, editionTitle: item.editionTitle,
+            genres: tmdb.genres.isEmpty ? item.genres : tmdb.genres,
+            externalIDs: (item.externalIDs ?? [:]).merging(["tmdb": String(tmdb.id)]) { _, new in new },
+            libraryID: item.libraryID)
+        let cast = tmdb.cast.isEmpty ? detail.cast : tmdb.cast.enumerated().map { index, person in
+            MediaPerson(id: "tmdb-cast:\(tmdb.id):\(index)", name: person.name, role: person.role, imageURL: person.photoURL)
+        }
+        let directors = tmdb.directors.isEmpty ? detail.directors : tmdb.directors.map {
+            MediaPerson(id: "tmdb-crew:\($0)", name: $0, role: String(localized: "Director"), imageURL: nil)
+        }
+        var result = MediaItemDetail(
+            item: enrichedItem, tagline: detail.tagline,
+            genres: tmdb.genres.isEmpty ? detail.genres : tmdb.genres, studios: detail.studios,
+            cast: cast, directors: directors, writers: detail.writers, chapters: detail.chapters,
+            mediaSources: detail.mediaSources, trailerURL: detail.trailerURL, contentRating: detail.contentRating,
+            nextEpisode: detail.nextEpisode, collections: detail.collections)
+        result.externalIDs = detail.externalIDs.merging(["tmdb": String(tmdb.id)]) { _, new in new }
+        return result
+    }
+
     // MARK: Episodes
 
     /// The episode Play means in a series: the one in progress watched last, else the first
