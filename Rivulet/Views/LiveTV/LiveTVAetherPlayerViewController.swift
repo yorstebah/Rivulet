@@ -216,6 +216,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     private let focusCatcher = FocusCatcherView()
     /// The rail shows once as each channel's picture first appears.
     private var didShowRailOnJoin = false
+    /// The guide over the playing channel (Right), while it is open.
+    private var guideOverlay: UIViewController?
 
     /// One front door for transport input. A Play/Pause can reach this VC as a
     /// press and ALSO as a system remote command for the same click; both go
@@ -327,6 +329,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     /// The live player on screen, for DEBUG launch hooks.
     static weak var debugCurrent: LiveTVAetherPlayerViewController?
     func debugHiddenDirection(up: Bool) { handleHiddenChromeDirection(up ? .up : .down) }
+    func debugHiddenDirection(right: Bool) { handleHiddenChromeDirection(right ? .right : .left) }
     func debugHideRail() { hideRail() }
     func debugPresent(_ name: String) { name == "info" ? presentInfoPanel() : presentChannelListPanel() }
     func debugMenu() { dismiss(animated: true) }
@@ -1254,6 +1257,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     }
 
     override var preferredFocusEnvironments: [UIFocusEnvironment] {
+        if let guideOverlay { return [guideOverlay] }
         if let descriptionOverlay { return [descriptionOverlay] }
         // A pane leaves focus on its pill, as AVKit's tabs do.
         if let activePanel { return activePanel.isPane ? [railView] : [activePanel] }
@@ -1909,6 +1913,70 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         presentPane(content: list, pill: railView.upNextButton)
     }
 
+    // MARK: - Guide over the picture
+
+    /// The guide, see-through over the playing channel, on its group and focused on it.
+    /// Select switches channel in place; Menu, or Left out of the grid, closes it.
+    private func presentGuideOverlay() {
+        guard guideOverlay == nil, !LiveTVDataStore.shared.channels.isEmpty else { return }
+        activePanel?.dismissPanel()
+        hideRail()
+        let guide = LiveGuideOverlay.make(
+            playing: channel,
+            onSelect: { [weak self] selected in
+                self?.closeGuideOverlay()
+                self?.switchChannel(to: selected)
+            },
+            onClose: { [weak self] in self?.closeGuideOverlay() })
+        guideOverlay = guide
+        guide.view.frame = view.bounds
+        guide.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addChild(guide)
+        view.addSubview(guide.view)
+        guide.didMove(toParent: self)
+        guide.view.layoutIfNeeded()
+        handFocusToGuide(guide, attempt: 0)
+    }
+
+    /// Into the playing channel's programme once the guide has laid out its rows (it names
+    /// that cell `initialFocusTarget`): landing on a category pill first would switch the
+    /// guide to that category. Covered is not enough, the focused catcher keeps focus under
+    /// the guide, so it is hidden at the hand-off. After about 1.5 s, the guide as it is.
+    private func handFocusToGuide(_ guide: UIViewController, attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (attempt == 0 ? 0 : 0.05)) { [weak self] in
+            guard let self, self.guideOverlay === guide else { return }
+            let grid = Self.guideGrid(in: guide.view) as? EPGContainerView
+            guard grid?.initialFocusTarget != nil || attempt >= 30 else {
+                self.handFocusToGuide(guide, attempt: attempt + 1)
+                return
+            }
+            self.focusCatcher.isHidden = true
+            UIFocusSystem.focusSystem(for: self.view)?.requestFocusUpdate(to: grid ?? guide.view)
+        }
+    }
+
+    /// The guide's UIKit grid inside its hosting view.
+    private static func guideGrid(in view: UIView) -> UIView? {
+        if view is EPGContainerView { return view }
+        for subview in view.subviews {
+            if let found = guideGrid(in: subview) { return found }
+        }
+        return nil
+    }
+
+    private func closeGuideOverlay() {
+        guard let guide = guideOverlay else { return }
+        guideOverlay = nil
+        guide.willMove(toParent: nil)
+        guide.view.removeFromSuperview()
+        guide.removeFromParent()
+        focusCatcher.isHidden = false
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            UIFocusSystem.focusSystem(for: self.view)?.requestFocusUpdate(to: self.focusCatcher)
+        }
+    }
+
     /// Switches channels in place; the VC, chrome and render surface survive.
     /// Do not dismiss and re-present: the presenting SwiftUI host is out of the
     /// window while the player covers it, so a new player never appears.
@@ -2277,7 +2345,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         case .left:
             skip(by: -InputConfig.tapSeekBackSeconds)
         case .right:
-            skip(by: InputConfig.tapSeekSeconds)
+            // The guide over the picture; the rail's skip button skips forward.
+            presentGuideOverlay()
         case .up:
             // AVKit lands Up from the picture on the first tool button.
             if let tool = railView.firstToolButton { railView.setFocusLanding(tool) }

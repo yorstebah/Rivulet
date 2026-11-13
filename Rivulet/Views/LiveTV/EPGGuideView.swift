@@ -863,11 +863,12 @@ final class EPGContainerView: UIView {
             cv.layoutIfNeeded()
             guard let cell = cv.cellForItem(at: indexPath) else { return }
             // Nothing here holds focus yet: the guide has just replaced the
-            // List, whose focused row went with it. A request from this view
-            // would be ignored, so it goes to the focus system itself.
+            // List, whose focused row went with it, or opened over the player.
+            // A request from this view would be ignored, so it goes to the
+            // focus system itself, unless something is presented over the guide.
             if let system = UIFocusSystem.focusSystem(for: self),
                (system.focusedItem as? UIView)?.isDescendant(of: self) != true,
-               self.window?.rootViewController?.presentedViewController == nil {
+               self.isFrontmost {
                 system.requestFocusUpdate(to: cell)
                 return
             }
@@ -891,6 +892,14 @@ final class EPGContainerView: UIView {
             return [initialFocusTarget]
         }
         return super.preferredFocusEnvironments
+    }
+
+    /// Nothing is presented over the guide: it sits in the topmost presented
+    /// controller's view (the shell's, or the player it was laid over).
+    var isFrontmost: Bool {
+        guard var top = window?.rootViewController else { return false }
+        while let presented = top.presentedViewController { top = presented }
+        return isDescendant(of: top.view)
     }
 
     /// The programme focus first enters on, opened from the List. Cleared

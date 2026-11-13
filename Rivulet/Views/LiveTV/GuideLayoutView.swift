@@ -24,6 +24,10 @@ struct GuideLayoutView: View {
     /// channel to come back on. nil for the Guide layout itself.
     var initialChannelId: String?
     var onExit: ((_ group: String?, _ channelId: String?) -> Void)?
+    /// Laid over the playing channel (Right in the player): no backdrop of its own, so the
+    /// picture shows through, and Select hands the channel back instead of opening a player.
+    var overPlayer = false
+    var onSelectChannel: ((UnifiedChannel) -> Void)?
 
     @StateObject private var dataStore = LiveTVDataStore.shared
     @ObservedObject private var channelLists = LiveChannelListStore.shared
@@ -32,10 +36,13 @@ struct GuideLayoutView: View {
     @State private var selectedGroup: String?
 
     init(sourceIdFilter: String? = nil, initialGroup: String? = nil, initialChannelId: String? = nil,
-         onExit: ((_ group: String?, _ channelId: String?) -> Void)? = nil) {
+         onExit: ((_ group: String?, _ channelId: String?) -> Void)? = nil,
+         overPlayer: Bool = false, onSelectChannel: ((UnifiedChannel) -> Void)? = nil) {
         self.sourceIdFilter = sourceIdFilter
         self.initialChannelId = initialChannelId
         self.onExit = onExit
+        self.overPlayer = overPlayer
+        self.onSelectChannel = onSelectChannel
         _selectedGroup = State(initialValue: initialGroup)
     }
 
@@ -241,7 +248,12 @@ struct GuideLayoutView: View {
                 // No custom base: when the focused programme has no artwork the
                 // stock system background (the same one Settings uses) shows
                 // through. When artwork exists, `ambiance` paints it on top.
-                ambiance
+                // Over the player the picture is the backdrop, dimmed to read the grid on.
+                if overPlayer {
+                    Color.black.opacity(0.45).ignoresSafeArea()
+                } else {
+                    ambiance
+                }
 
                 if channels.isEmpty {
                     ProgressView()
@@ -504,6 +516,11 @@ struct GuideLayoutView: View {
     // MARK: - Selection
 
     private func selectChannel(_ channel: UnifiedChannel) {
+        // Over the player: the player switches to it in place.
+        if let onSelectChannel {
+            onSelectChannel(channel)
+            return
+        }
         // Live TV plays through Aether (same OSD as Aether VOD): HLS goes
         // straight to AVPlayer, everything else is remuxed by the engine.
         // Presented as a full-screen modal so it escapes the guide's
