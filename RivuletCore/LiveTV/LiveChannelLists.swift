@@ -52,11 +52,16 @@ final class LiveChannelListStore: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        if let data = defaults.data(forKey: Self.listsKey),
-           let saved = try? JSONDecoder().decode([LiveChannelList].self, from: data) {
-            lists = saved
-        }
-        pinnedCategoryKeys = defaults.stringArray(forKey: Self.pinsKey) ?? []
+        reload()
+    }
+
+    /// Rereads both from the device's store, as iCloud sync does after changing them.
+    func reload() {
+        let saved = defaults.data(forKey: Self.listsKey)
+            .flatMap { try? JSONDecoder().decode([LiveChannelList].self, from: $0) } ?? []
+        if saved != lists { lists = saved }
+        let pins = defaults.stringArray(forKey: Self.pinsKey) ?? []
+        if pins != pinnedCategoryKeys { pinnedCategoryKeys = pins }
     }
 
     // MARK: - Lists

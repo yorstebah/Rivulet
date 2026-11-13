@@ -157,6 +157,9 @@ final class CloudSync: ObservableObject {
         let applied = mirror.reconcile()
         guard !applied.isEmpty else { return }
         LiveTVDataStore.shared.syncedPreferencesChanged(applied)
+        if applied.contains(SyncCatalog.channelListsKey) || applied.contains(LiveChannelListStore.pinsKey) {
+            LiveChannelListStore.shared.reload()
+        }
         PlexExtraServers.shared.syncedPreferencesChanged(applied)
         if applied.contains(JellyfinLiveTVProvider.hiddenKey) {
             _ = JellyfinLiveTVProvider.setHidden(defaults.bool(forKey: JellyfinLiveTVProvider.hiddenKey))
