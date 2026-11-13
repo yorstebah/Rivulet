@@ -1838,7 +1838,7 @@ final class ChannelColumnView: UICollectionReusableView {
         numberLabel.text = number
         numberLabel.isHidden = number == nil
         logoHeight.constant = number == nil ? 70 : 52
-        nameLabel.text = channel.name
+        nameLabel.text = channel.displayName
         nameLabel.isHidden = channel.logoURL != nil
 
         // Reused cells get reconfigured rapidly during fast guide scrolling.
@@ -2123,8 +2123,8 @@ struct GuideInfoBar: View {
     }
 
     private func channelLine(_ channel: UnifiedChannel) -> String {
-        if let number = channel.displayNumber { return "\(number) · \(channel.name)" }
-        return channel.name
+        if let number = channel.displayNumber { return "\(number) · \(channel.displayName)" }
+        return channel.displayName
     }
 
     private func timeRange(_ program: UnifiedProgram) -> String {

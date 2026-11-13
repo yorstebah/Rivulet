@@ -45,11 +45,11 @@ enum LiveProgramMenu {
     // MARK: - Content
 
     private static func header(program: UnifiedProgram?, channel: UnifiedChannel) -> TileMenuHeader {
-        let channelLine = [channel.displayNumber.map(String.init), channel.name]
+        let channelLine = [channel.displayNumber.map(String.init), channel.displayName]
             .compactMap { $0 }
             .joined(separator: " · ")
         guard let program, !program.id.contains(":placeholder:") else {
-            return TileMenuHeader(title: channel.name, detail: channelLine)
+            return TileMenuHeader(title: channel.displayName, detail: channelLine)
         }
         let time = Date.FormatStyle.dateTime.hour().minute()
         var detailParts = [
@@ -81,7 +81,7 @@ enum LiveProgramMenu {
 
         let airingNow = program.map { $0.startTime <= Date() && $0.endTime > Date() } ?? true
         watch.append(TileMenuAction(
-            title: airingNow ? "Watch Now" : "Watch \(channel.name)",
+            title: airingNow ? "Watch Now" : "Watch \(channel.displayName)",
             systemImage: "play.fill"
         ) { onWatch(channel) })
         if let onMultiview, airingNow {

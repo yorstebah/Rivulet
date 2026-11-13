@@ -783,12 +783,12 @@ enum SettingsContent {
             ? Dictionary(store.sources.map { ($0.id, $0.displayName) }, uniquingKeysWith: { first, _ in first })
             : [:]
         return favorites.map { channel in
-            let title = [channel.displayNumber.map(String.init), channel.name, sourceNames[channel.sourceId].map { "· \($0)" }]
+            let title = [channel.displayNumber.map(String.init), channel.displayName, sourceNames[channel.sourceId].map { "· \($0)" }]
                 .compactMap { $0 }
                 .joined(separator: " ")
             return SettingsRowItem(id: "fav_\(channel.id)", verbatim: title,
                                    kind: .action(destructive: false, handler: { vc in
-                presentConfirm(on: vc, title: "Remove \"\(channel.name)\"?",
+                presentConfirm(on: vc, title: "Remove \"\(channel.displayName)\"?",
                                message: "This removes the channel from your favorites. You can add it again by holding Select on it in What's On or the guide.",
                                confirmTitle: "Remove", destructive: true) {
                     if store.isFavorite(channel) { store.toggleFavorite(channel) }

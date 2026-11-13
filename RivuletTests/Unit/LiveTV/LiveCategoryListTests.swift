@@ -235,6 +235,9 @@ final class LiveCategoryListTests: XCTestCase {
         XCTAssertNil(xtream.displayNumber)
         XCTAssertEqual(xtream.displayNumberAndName, "NPO 1")
         XCTAssertEqual(tuner.displayNumberAndName, "7 · BBC One")
+        let tagged = UnifiedChannel(id: "x:2", sourceType: .xtream, sourceId: "x", name: "UK |  SKY SPORTS F1")
+        XCTAssertEqual(tagged.displayName, "SKY SPORTS F1")
+        XCTAssertEqual(UnifiedChannel(id: "p:2", sourceType: .plex, sourceId: "p", name: "UK | BBC").displayName, "UK | BBC")
         // Number search still finds the panel's number.
         XCTAssertEqual(LiveChannelSearch.search("4318", in: LiveChannelSearch.Index([xtream])).channels.map(\.id), ["x:1"])
     }

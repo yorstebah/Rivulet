@@ -1013,11 +1013,11 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         let scrubAt = previewTarget(in: shift).map { now.addingTimeInterval(-(shift.edgeTime - $0)) }
         let current = store.program(for: channel, at: scrubAt ?? onScreenAt) ?? store.getCurrentProgram(for: channel)
 
-        let eyebrow = [channel.displayNumber.map(String.init), channel.name]
+        let eyebrow = [channel.displayNumber.map(String.init), channel.displayName]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
-        railView.setTitle(current?.title ?? channel.name, eyebrow: eyebrow.isEmpty ? nil : eyebrow)
+        railView.setTitle(current?.title ?? channel.displayName, eyebrow: eyebrow.isEmpty ? nil : eyebrow)
 
         // Not the engine's `isAtLiveEdge` (one segment): streams drift that
         // far on their own, and Go Live bounced in and out, shifting the rail.
@@ -1072,8 +1072,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
 
 
         NowPlayingService.shared.updateLive(
-            title: current?.title ?? channel.name,
-            channelName: channel.name,
+            title: current?.title ?? channel.displayName,
+            channelName: channel.displayName,
             isPlaying: !isUserPaused,
             artworkURL: current?.posterURL ?? current?.landscapeURL ?? current?.iconURL ?? channel.logoURL,
             onScreenAt: onScreenAt
@@ -1999,7 +1999,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         let store = LiveTVDataStore.shared
         let current = store.getCurrentProgram(for: channel)
         let next = store.getNextProgram(for: channel)
-        let channelLine = [channel.displayNumber.map(String.init), channel.name]
+        let channelLine = [channel.displayNumber.map(String.init), channel.displayName]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         var meta = [channelLine]
         if let current {
@@ -2011,7 +2011,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         }
         let card = PlayerInfoCardView(content: .init(
             posterURL: current?.posterURL ?? channel.logoURL,
-            title: current?.title ?? channel.name,
+            title: current?.title ?? channel.displayName,
             summary: current?.description,
             badges: [current?.contentRating].compactMap { $0 },
             metaLine: meta.filter { !$0.isEmpty },
@@ -2058,7 +2058,7 @@ final class LiveTVAetherPlayerViewController: UIViewController {
 
     /// Source facts plus the engine's live stats. No stream URL: IPTV ones embed credentials.
     private func presentDetailsPanel() {
-        var source = [PlayerDetailsPaneView.Row(label: String(localized: "Channel"), value: [channel.displayNumber.map { "\($0)" }, channel.name].compactMap { $0 }.joined(separator: " "))]
+        var source = [PlayerDetailsPaneView.Row(label: String(localized: "Channel"), value: [channel.displayNumber.map { "\($0)" }, channel.displayName].compactMap { $0 }.joined(separator: " "))]
         source.append(.init(label: String(localized: "Provider"), value: channel.sourceType.displayName))
         let route = lastResortPlayer != nil ? "AVPlayer" : isNativeHLSRoute ? "HLS" : "AetherEngine"
         source.append(.init(label: String(localized: "Route"), value: route))

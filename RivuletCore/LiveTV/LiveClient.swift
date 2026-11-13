@@ -37,9 +37,19 @@ extension UnifiedChannel {
     /// nothing, so it is left out; sorting and number search still use it.
     var displayNumber: ChannelNumber? { sourceType == .xtream ? nil : channelNumber }
 
-    /// `numberAndName` with `displayNumber`.
+    /// The name to show: an IPTV list's leading region or quality tag ("UK | ", "┃NL┃ ")
+    /// left out, as the category already says it (`XtreamService.cleanName`). Search and
+    /// sorting keep the full name.
+    var displayName: String {
+        switch sourceType {
+        case .xtream, .genericM3U, .dispatcharr: XtreamService.cleanName(name)
+        default: name
+        }
+    }
+
+    /// `numberAndName` with `displayNumber` and `displayName`.
     var displayNumberAndName: String {
-        [displayNumber.map(String.init), name].compactMap { $0 }.joined(separator: " · ")
+        [displayNumber.map(String.init), displayName].compactMap { $0 }.joined(separator: " · ")
     }
 }
 

@@ -191,8 +191,8 @@ final class LiveCardCell: UICollectionViewCell {
         // Text
         switch item.kind {
         case .channel:
-            titleLabel.text = program?.displayTitle ?? channel?.name ?? String(localized: "Live")
-            detailLabel.text = [channel?.displayNumber.map(String.init), channel?.name]
+            titleLabel.text = program?.displayTitle ?? channel?.displayName ?? String(localized: "Live")
+            detailLabel.text = [channel?.displayNumber.map(String.init), channel?.displayName]
                 .compactMap { $0 }
                 .joined(separator: " · ")
             // On now and set to record means it is recording. LIVE is for
@@ -200,7 +200,7 @@ final class LiveCardCell: UICollectionViewCell {
             setPill(item.setToRecord ? String(localized: "● REC") : program?.isLiveAiring == true ? String(localized: "▶ LIVE") : nil, color: .systemRed)
         case .upcoming:
             titleLabel.text = program?.displayTitle ?? String(localized: "Upcoming")
-            detailLabel.text = channel?.name
+            detailLabel.text = channel?.displayName
             setPill(program.map { LiveCardItem.startLabel($0, now: now) }, color: UIColor.white.withAlphaComponent(0.25),
                     recordDot: item.setToRecord)
         case .recording:
