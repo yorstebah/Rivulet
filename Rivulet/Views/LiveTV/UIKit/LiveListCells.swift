@@ -167,7 +167,7 @@ final class LiveChannelRowCell: UICollectionViewCell {
 
     /// With no guide data the row is the channel alone: no bar, no empty line.
     func configure(_ channel: UnifiedChannel, nowNext: LiveNowNext, now: Date = Date()) {
-        nameLabel.text = channel.numberAndName
+        nameLabel.text = channel.displayNumberAndName
         groupLabel.text = LiveGroupOrder.trimmed(channel.groupTitle)
         if let current = nowNext.current {
             programLabel.text = current.displayTitle

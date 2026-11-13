@@ -1834,7 +1834,7 @@ final class ChannelColumnView: UICollectionReusableView {
 
         // Number under the logo when the source has one; the logo takes the
         // whole box when it does not.
-        let number = channel.channelNumber.map(String.init)
+        let number = channel.displayNumber.map(String.init)
         numberLabel.text = number
         numberLabel.isHidden = number == nil
         logoHeight.constant = number == nil ? 70 : 52
@@ -2123,7 +2123,7 @@ struct GuideInfoBar: View {
     }
 
     private func channelLine(_ channel: UnifiedChannel) -> String {
-        if let number = channel.channelNumber { return "\(number) · \(channel.name)" }
+        if let number = channel.displayNumber { return "\(number) · \(channel.name)" }
         return channel.name
     }
 

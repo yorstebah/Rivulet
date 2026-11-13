@@ -45,7 +45,7 @@ enum LiveProgramMenu {
     // MARK: - Content
 
     private static func header(program: UnifiedProgram?, channel: UnifiedChannel) -> TileMenuHeader {
-        let channelLine = [channel.channelNumber.map(String.init), channel.name]
+        let channelLine = [channel.displayNumber.map(String.init), channel.name]
             .compactMap { $0 }
             .joined(separator: " · ")
         guard let program, !program.id.contains(":placeholder:") else {
@@ -150,7 +150,7 @@ enum LiveProgramMenu {
         }
         let popup = TileMenuPopupViewController(
             sections: [rows, [new]],
-            header: TileMenuHeader(title: String(localized: "Add to List"), detail: channel.numberAndName))
+            header: TileMenuHeader(title: String(localized: "Add to List"), detail: channel.displayNumberAndName))
         // The programme menu has just closed; present after it.
         DispatchQueue.main.async { topmost(from: presenter).present(popup, animated: false) }
     }

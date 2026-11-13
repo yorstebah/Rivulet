@@ -272,7 +272,7 @@ final class LiveBrowseViewController: UIViewController {
     private func showInfo(for item: LiveCardItem) {
         let program = item.program
         let channel = item.channel
-        let channelLine = [channel?.channelNumber.map(String.init), channel?.name]
+        let channelLine = [channel?.displayNumber.map(String.init), channel?.name]
             .compactMap { $0 }
             .joined(separator: " · ")
 

@@ -192,7 +192,7 @@ final class LiveCardCell: UICollectionViewCell {
         switch item.kind {
         case .channel:
             titleLabel.text = program?.displayTitle ?? channel?.name ?? String(localized: "Live")
-            detailLabel.text = [channel?.channelNumber.map(String.init), channel?.name]
+            detailLabel.text = [channel?.displayNumber.map(String.init), channel?.name]
                 .compactMap { $0 }
                 .joined(separator: " · ")
             // On now and set to record means it is recording. LIVE is for

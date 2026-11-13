@@ -227,6 +227,18 @@ final class LiveCategoryListTests: XCTestCase {
                                        openedFrom: "pin|\(key)", channelId: "m:b"), "all|m")
     }
 
+    // MARK: - Numbers
+
+    func test_xtreamNumbers_areNotShown_otherSourcesKeepTheirs() {
+        let xtream = UnifiedChannel(id: "x:1", sourceType: .xtream, sourceId: "x", channelNumber: 4318, name: "NPO 1")
+        let tuner = UnifiedChannel(id: "p:1", sourceType: .plex, sourceId: "p", channelNumber: 7, name: "BBC One")
+        XCTAssertNil(xtream.displayNumber)
+        XCTAssertEqual(xtream.displayNumberAndName, "NPO 1")
+        XCTAssertEqual(tuner.displayNumberAndName, "7 · BBC One")
+        // Number search still finds the panel's number.
+        XCTAssertEqual(LiveChannelSearch.search("4318", in: LiveChannelSearch.Index([xtream])).channels.map(\.id), ["x:1"])
+    }
+
     // MARK: - Now and next
 
     func test_nowNext_skipsPlaceholders_andMeasuresProgress() {

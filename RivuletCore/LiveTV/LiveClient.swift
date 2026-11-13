@@ -31,6 +31,16 @@ extension UnifiedChannel {
     var numberAndName: String {
         [channelNumber.map(String.init), name].compactMap { $0 }.joined(separator: " · ")
     }
+
+    /// The number to show beside the name. An Xtream panel's number is its
+    /// own running count across the whole lineup, which tells the viewer
+    /// nothing, so it is left out; sorting and number search still use it.
+    var displayNumber: ChannelNumber? { sourceType == .xtream ? nil : channelNumber }
+
+    /// `numberAndName` with `displayNumber`.
+    var displayNumberAndName: String {
+        [displayNumber.map(String.init), name].compactMap { $0 }.joined(separator: " · ")
+    }
 }
 
 extension UnifiedProgram {

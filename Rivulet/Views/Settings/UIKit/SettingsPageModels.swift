@@ -783,7 +783,7 @@ enum SettingsContent {
             ? Dictionary(store.sources.map { ($0.id, $0.displayName) }, uniquingKeysWith: { first, _ in first })
             : [:]
         return favorites.map { channel in
-            let title = [channel.channelNumber.map(String.init), channel.name, sourceNames[channel.sourceId].map { "· \($0)" }]
+            let title = [channel.displayNumber.map(String.init), channel.name, sourceNames[channel.sourceId].map { "· \($0)" }]
                 .compactMap { $0 }
                 .joined(separator: " ")
             return SettingsRowItem(id: "fav_\(channel.id)", verbatim: title,
