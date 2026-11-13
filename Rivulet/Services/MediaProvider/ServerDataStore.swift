@@ -70,6 +70,12 @@ final class ServerDataStore: ObservableObject {
         // server never flashes the signed-out welcome.
         if !PlexUserProfileManager.shared.isRestrictedProfile {
             sources = OtherServerKind.all.compactMap { $0.account().map { Source(providerID: $0.providerID, name: $0.name) } }
+            // Xtream films and series follow their Live TV sources: without them here the
+            // first render sees Live TV alone and opens on it.
+            if MediaProviderRegistry.includesXtreamVOD {
+                sources += LiveTVDataStore.shared.xtreamSources.filter { XtreamVODSources.isEnabled($0.id) }
+                    .map { Source(providerID: $0.id, name: $0.name) }
+            }
         }
         // Watch-state changes (detail page, tile menus, playback) post this.
         refreshObserver = NotificationCenter.default.addObserver(
