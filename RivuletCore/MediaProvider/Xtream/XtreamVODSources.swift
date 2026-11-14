@@ -31,6 +31,28 @@ enum XtreamVODSources {
         onChanged?()
     }
 
+    // MARK: - Languages
+
+    /// Each source's languages (`XtreamVODLanguages`), by source id. A source not listed keeps the
+    /// defaults, which follow the device's languages. Synced: a source has one id everywhere.
+    static let languagesKey = "xtreamVODLanguages"
+
+    static func languages(for sourceID: String, defaults: UserDefaults = .standard) -> XtreamVODLanguages {
+        let saved = defaults.dictionary(forKey: languagesKey) as? [String: [String]]
+        return saved?[sourceID].map(XtreamVODLanguages.init(origins:)) ?? .defaults()
+    }
+
+    static func setLanguages(_ languages: XtreamVODLanguages, for sourceID: String, defaults: UserDefaults = .standard) {
+        var saved = defaults.dictionary(forKey: languagesKey) as? [String: [String]] ?? [:]
+        saved[sourceID] = languages.origins
+        defaults.set(saved, forKey: languagesKey)
+        onChanged?()
+    }
+
+    /// The languages a source's titles carry, most common first, once its lists have loaded:
+    /// what Settings offers. In memory only.
+    static var availableOrigins: [String: [(origin: String, count: Int)]] = [:]
+
     private static var built: [String: (account: XtreamAccount, name: String, provider: XtreamVODProvider)] = [:]
 
     /// A provider for each switched-on Xtream source in Live TV.

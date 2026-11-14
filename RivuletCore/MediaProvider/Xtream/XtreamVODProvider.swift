@@ -104,6 +104,11 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         async let series = catalog.seriesLists()
         let movies = try await catalog.movieLists()
         let shows = (try? await series)?.titles ?? []
+        // The languages Settings offers for this source, once.
+        if await MainActor.run(body: { XtreamVODSources.availableOrigins[id] == nil }) {
+            let origins = await catalog.availableOrigins()
+            await MainActor.run { XtreamVODSources.availableOrigins[id] = origins }
+        }
         var libraries: [MediaLibrary] = []
         if !movies.titles.isEmpty { libraries.append(library(.movies)) }
         if !shows.isEmpty { libraries.append(library(.series)) }
@@ -114,7 +119,14 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         MediaLibrary(id: library.rawValue, providerID: id, title: library.title, kind: library.kind)
     }
 
+    /// Brings the catalogue to the viewer's languages for this source; nothing when unchanged.
+    private func applyLanguages() async {
+        let languages = await MainActor.run { XtreamVODSources.languages(for: id) }
+        await catalog.setLanguages(languages)
+    }
+
     func items(in library: MediaLibrary, sort: SortOption, page: Page) async throws -> PagedResult<MediaItem> {
+        await applyLanguages()
         let state = await state()
         let result: (items: [MediaItem], total: Int)
         switch XtreamVODLibrary(rawValue: library.id) {
@@ -140,7 +152,8 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     }
 
     func letterCounts(in library: MediaLibrary) async throws -> [PlexFirstCharacter] {
-        switch XtreamVODLibrary(rawValue: library.id) {
+        await applyLanguages()
+        return switch XtreamVODLibrary(rawValue: library.id) {
         case .movies: try await catalog.letterCounts(.movies)
         case .series: try await catalog.letterCounts(.series)
         case nil: []
@@ -149,15 +162,16 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
 
     /// The panel's categories that hold a title, in the panel's order.
     func collections(in library: MediaLibrary) async throws -> [MediaItem] {
+        await applyLanguages()
         switch XtreamVODLibrary(rawValue: library.id) {
         case .movies:
-            let lists = try await catalog.movieLists()
+            let lists = try await catalog.shownMovieLists()
             let posters = Dictionary(lists.titles.compactMap { movie in movie.categoryId.map { ($0, movie.posterURL) } },
                                      uniquingKeysWith: { first, _ in first })
             return lists.categories.filter { posters[$0.id] != nil }
                 .map { XtreamVODMapping.item($0, library: .movies, poster: posters[$0.id] ?? nil, provider: id) }
         case .series:
-            let lists = try await catalog.seriesLists()
+            let lists = try await catalog.shownSeriesLists()
             let posters = Dictionary(lists.titles.compactMap { show in show.categoryId.map { ($0, show.coverURL) } },
                                      uniquingKeysWith: { first, _ in first })
             return lists.categories.filter { posters[$0.id] != nil }
@@ -171,10 +185,12 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let state = await state()
         switch XtreamVODID(itemID: itemRef.itemID) {
         case .category(.movies, let category):
-            return try await catalog.movieLists().titles.filter { $0.categoryId == category }
+            await applyLanguages()
+            return try await catalog.shownMovieLists().titles.filter { $0.categoryId == category }
                 .map { XtreamVODMapping.item($0, provider: id, state: state) }
         case .category(.series, let category):
-            return try await catalog.seriesLists().titles.filter { $0.categoryId == category }
+            await applyLanguages()
+            return try await catalog.shownSeriesLists().titles.filter { $0.categoryId == category }
                 .map { XtreamVODMapping.item($0, provider: id, state: state) }
         case .series(let seriesID):
             let (series, info) = try await seriesAndInfo(seriesID)
@@ -219,6 +235,7 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     // MARK: - Search
 
     func search(_ query: String) async throws -> [MediaItem] {
+        await applyLanguages()
         let state = await state()
         let movies = try await catalog.searchMovies(query, limit: 50)
             .map { XtreamVODMapping.item($0, provider: id, state: state) }
@@ -229,16 +246,18 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
 
     /// Other titles in the same panel category.
     func related(for ref: MediaItemRef, kind: MediaKind) async throws -> RelatedContent {
+        await applyLanguages()
         let state = await state()
         switch XtreamVODID(itemID: ref.itemID) {
         case .movie(let movieID):
-            let titles = try await catalog.movieLists().titles
-            guard let category = titles.first(where: { $0.id == movieID })?.categoryId else { break }
+            // The title itself may be a copy the viewer's languages hide (opened from history).
+            guard let category = try await catalog.movieLists().titles.first(where: { $0.id == movieID })?.categoryId else { break }
+            let titles = try await catalog.shownMovieLists().titles
             return RelatedContent(items: titles.filter { $0.categoryId == category && $0.id != movieID }.prefix(20)
                 .map { XtreamVODMapping.item($0, provider: id, state: state) }, collection: nil)
         case .series(let seriesID):
-            let titles = try await catalog.seriesLists().titles
-            guard let category = titles.first(where: { $0.id == seriesID })?.categoryId else { break }
+            guard let category = try await catalog.seriesLists().titles.first(where: { $0.id == seriesID })?.categoryId else { break }
+            let titles = try await catalog.shownSeriesLists().titles
             return RelatedContent(items: titles.filter { $0.categoryId == category && $0.id != seriesID }.prefix(20)
                 .map { XtreamVODMapping.item($0, provider: id, state: state) }, collection: nil)
         default:
@@ -438,13 +457,16 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     /// shows the row on its next load when the work runs longer.
     func forYouHub(in library: MediaLibrary, now: Date = Date()) async -> MediaHub? {
         guard let kind = XtreamVODLibrary(rawValue: library.id) else { return nil }
+        await applyLanguages()
+        let languages = await MainActor.run { XtreamVODSources.languages(for: id) }
         let state = await state()
         let seeds = XtreamForYou.seeds(state, source: id, library: kind, now: now)
         guard !seeds.isEmpty else { return nil }
         let hasKey = await tmdb.hasKey()
         // The newest place too: a synced device can change records without changing their count.
         let newest = state.records.values.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0
-        let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(state.records.count)|\(newest)"
+        let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(state.records.count)|\(newest)|"
+            + languages.origins.joined(separator: ",")
         let cached = forYouCache.withLock { $0[library.id] }
         var ids = cached?.ids
         if cached == nil || cached?.key != cacheKey || now.timeIntervalSince(cached!.at) >= 6 * 3600 {
@@ -481,17 +503,32 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     private func forYouIDs(_ kind: XtreamVODLibrary, seeds: [XtreamForYou.Seed], state: XtreamVODMapping.State,
                            useTMDB: Bool, now: Date) async -> [String] {
         let seen = XtreamForYou.seen(state, source: id, library: kind)
-        let candidates: [XtreamForYou.Candidate]
+        let seedIDs = Set(seeds.map(\.id))
+        var candidates: [XtreamForYou.Candidate]
+        // What may be offered is the shown lists; the seeds come from the full ones, as a
+        // favorite may be a copy the viewer's languages now hide.
         switch kind {
         case .movies:
-            guard let movies = try? await catalog.movieLists().titles else { return [] }
-            candidates = movies.map { .init(id: $0.id, name: $0.name, year: $0.year, categoryId: $0.categoryId,
-                                            rating: $0.rating, addedAt: $0.addedAt) }
+            guard let shown = try? await catalog.shownMovieLists().titles,
+                  let all = try? await catalog.movieLists().titles else { return [] }
+            let candidate = { (movie: XtreamMovie) in
+                XtreamForYou.Candidate(id: movie.id, name: movie.name, year: movie.year, categoryId: movie.categoryId,
+                                       rating: movie.rating, addedAt: movie.addedAt)
+            }
+            candidates = shown.map(candidate)
+            let present = Set(candidates.map(\.id))
+            candidates += all.filter { seedIDs.contains($0.id) && !present.contains($0.id) }.map(candidate)
         case .series:
-            guard let series = try? await catalog.seriesLists().titles else { return [] }
-            candidates = series.map { .init(id: $0.id, name: $0.name, year: $0.year, categoryId: $0.categoryId,
-                                            rating: $0.rating, addedAt: $0.updatedAt,
-                                            genres: XtreamForYou.genres($0.genre)) }
+            guard let shown = try? await catalog.shownSeriesLists().titles,
+                  let all = try? await catalog.seriesLists().titles else { return [] }
+            let candidate = { (show: XtreamSeries) in
+                XtreamForYou.Candidate(id: show.id, name: show.name, year: show.year, categoryId: show.categoryId,
+                                       rating: show.rating, addedAt: show.updatedAt,
+                                       genres: XtreamForYou.genres(show.genre))
+            }
+            candidates = shown.map(candidate)
+            let present = Set(candidates.map(\.id))
+            candidates += all.filter { seedIDs.contains($0.id) && !present.contains($0.id) }.map(candidate)
         }
         let byID = Dictionary(candidates.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let names = byID.mapValues { LiveChannelSearch.normalized($0.name) }

@@ -230,6 +230,7 @@ enum SettingsContent {
         case .iptv:        return iptv
         case .liveTVSourceDetail: return liveTVSourceDetail
         case .liveTVFavorites: return liveTVFavorites
+        case .xtreamLanguages: return xtreamLanguages
         case .addLiveTVSource:  return addLiveTVSource
         case .addXtream:        return addXtream
         case .addDispatcharr:   return addDispatcharr
@@ -770,6 +771,47 @@ enum SettingsContent {
     /// asks before removing it (the Pinned Collections pattern). A removed row
     /// goes at once, so a move never passes a channel that is no longer a
     /// favourite.
+    /// A source's film and series languages: All Languages, then each language its titles carry,
+    /// the chosen ones first in order of preference. Select adds a language at the end or takes it
+    /// out; the first chosen is the copy shown when a title has several.
+    private static var xtreamLanguages: [SettingsRowItem] {
+        guard let source = pendingSourceDetail else { return [] }
+        let current = XtreamVODSources.languages(for: source.id)
+        let available = XtreamVODSources.availableOrigins[source.id] ?? []
+        let counts = Dictionary(available.map { ($0.origin, $0.count) }, uniquingKeysWith: { first, _ in first })
+        let order = current.origins + available.map(\.origin).filter { !current.origins.contains($0) }
+        var rows = [SettingsRowItem(id: "lang_all", title: "All Languages", kind: .selectable(
+            isSelected: { XtreamVODSources.languages(for: source.id).showsEverything },
+            value: { nil },
+            handler: { vc in
+                XtreamVODSources.setLanguages(.everything, for: source.id)
+                (vc as? SettingsPageViewController)?.reloadRows()
+            }))]
+        if available.isEmpty {
+            rows.append(SettingsRowItem(id: "lang_loading", title: "Loading Languages…", kind: .info(value: { "" })))
+        }
+        for origin in order {
+            rows.append(SettingsRowItem(id: "lang_\(origin)", verbatim: ContentOrigin.title(forOrigin: origin), kind: .selectable(
+                isSelected: { XtreamVODSources.languages(for: source.id).origins.contains(origin) },
+                value: { counts[origin].map { $0.formatted() } },
+                handler: { vc in
+                    var languages = XtreamVODSources.languages(for: source.id)
+                    if let index = languages.origins.firstIndex(of: origin) {
+                        languages.origins.remove(at: index)
+                    } else {
+                        languages.origins.append(origin)
+                    }
+                    XtreamVODSources.setLanguages(languages, for: source.id)
+                    (vc as? SettingsPageViewController)?.reloadRows()
+                })))
+        }
+        rows.append(SettingsRowItem(id: "lang_defaults", title: "Restore Defaults", kind: .action(destructive: false, handler: { vc in
+            XtreamVODSources.setLanguages(.defaults(), for: source.id)
+            (vc as? SettingsPageViewController)?.reloadRows()
+        })))
+        return rows
+    }
+
     private static var liveTVFavorites: [SettingsRowItem] {
         let store = LiveTVDataStore.shared
         let byId = Dictionary(store.channels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -1496,6 +1538,10 @@ enum SettingsContent {
             rows.append(SettingsRowItem(id: "src_xtreamVOD", title: "Movies and TV Shows", kind: .toggle(
                 get: { XtreamVODSources.isEnabled(source.id) },
                 set: { XtreamVODSources.setEnabled($0, for: source.id) })))
+            if XtreamVODSources.isEnabled(source.id) {
+                rows.append(SettingsRowItem(id: "src_vodLanguages", title: "Languages", kind: .navigationValue(
+                    .xtreamLanguages, value: { XtreamVODSources.languages(for: source.id).summary })))
+            }
             // The viewer's own TMDB key, for films' and series' details. One for every source.
             rows.append(SettingsRowItem(id: "src_tmdbKey", title: "TMDB API Key", kind: .textEntry(
                 value: { KeychainHelper.get(TMDBLookup.keychainKey) ?? "" },
@@ -1573,6 +1619,14 @@ enum SettingsContent {
             reload()
         case .plex where PlexAuthManager.shared.isAuthenticated:
             loadPlexServers(reload: reload)
+        case .xtreamLanguages where pendingSourceDetail.map({ XtreamVODSources.availableOrigins[$0.id] == nil }) == true:
+            // The languages come from the source's film and series lists: load them once.
+            guard let id = pendingSourceDetail?.id,
+                  let provider = XtreamVODSources.providers().first(where: { $0.id == id }) else { break }
+            Task { @MainActor in
+                _ = try? await provider.libraries()
+                reload()
+            }
         case .liveTVFavorites where LiveTVDataStore.shared.channels.isEmpty:
             // Settings can open before Live TV has loaded its channels.
             Task { @MainActor in

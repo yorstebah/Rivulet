@@ -66,7 +66,8 @@ final class PlexSession: ObservableObject {
             // Xtream progress or favorites from another device: repaint as after a watch-state change.
         CloudSync.onPreferencesApplied = { [weak self] keys in
             guard keys.contains(XtreamWatchProgressStore.defaultsKey)
-                    || keys.contains(XtreamWatchProgressStore.favoritesKey) else { return }
+                    || keys.contains(XtreamWatchProgressStore.favoritesKey)
+                    || keys.contains(XtreamVODSources.languagesKey) else { return }
             Task { await self?.watchStateDidChange() }
         }
         // The servers' Live TV follows every sign-in, sign-out and profile change (shared with tvOS).

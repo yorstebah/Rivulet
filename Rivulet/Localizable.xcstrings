@@ -3001,6 +3001,7 @@
         }
       }
     },
+    "All Languages" : {},
     "All episodes" : {
       "localizations" : {
         "de" : {
@@ -4657,9 +4658,12 @@
       }
     },
     "Country or Language" : {},
+    "Every copy of every title, as the provider lists them." : {},
     "Ex-Yugoslav" : {},
     "International" : {},
+    "Loading Languages…" : {},
     "Movies and TV Shows" : {},
+    "Multi first, then your device's languages, then English." : {},
     "Multilingual" : {},
     "Name Contains" : {},
     "Name Contains “%@”" : {},
@@ -4667,6 +4671,7 @@
     "New Smart List" : {},
     "New Smart List…" : {},
     "Original Version" : {},
+    "Restore Defaults" : {},
     "Smart List" : {},
     "Source" : {},
     "TMDB API Key" : {},
@@ -14607,6 +14612,7 @@
       }
     },
     "The Guide lists every channel against the time. What's On shows rows of what is on now, with multiview, like the Apple TV app. List shows your categories beside their channels and what is on each." : {},
+    "The languages of this provider's films and series you see. Each title shows once, in the first of your languages it has." : {},
     "The provider's films and series, as Movies and TV Shows libraries in the sidebar and on Home. Off leaves only its channels." : {},
     "Word in the Channel Name" : {},
     "Your Plex server's tuners. Select to see details or remove it." : {

@@ -45,6 +45,54 @@ actor XtreamVODCatalog {
     }
     private var derived: [XtreamVODLibrary: Derived] = [:]
 
+    /// The viewer's languages, and the lists as they show in them (`XtreamVODLanguages`).
+    private var languages = XtreamVODLanguages.everything
+    private var shownMovies: XtreamVODLists<XtreamMovie>?
+    private var shownSeries: XtreamVODLists<XtreamSeries>?
+
+    /// Sets the languages the shown lists keep; a change works them out again.
+    func setLanguages(_ languages: XtreamVODLanguages) {
+        guard languages != self.languages else { return }
+        self.languages = languages
+        shownMovies = nil
+        shownSeries = nil
+        derived = [:]
+    }
+
+    /// The films in the viewer's languages, one copy each, and the categories still holding one.
+    /// Listing, search, collections and For You read these; lookups by id read `movieLists`.
+    func shownMovieLists() async throws -> XtreamVODLists<XtreamMovie> {
+        let all = try await movieLists()
+        if let shownMovies, shownMovies.fetchedAt == all.fetchedAt { return shownMovies }
+        let kept = languages.shown(all.titles.map { ($0.name, $0.year, $0.tag) }).map { all.titles[$0] }
+        let lists = XtreamVODLists(titles: kept, categories: Self.holding(all.categories, kept.map(\.categoryId)),
+                                   fetchedAt: all.fetchedAt)
+        shownMovies = lists
+        return lists
+    }
+
+    func shownSeriesLists() async throws -> XtreamVODLists<XtreamSeries> {
+        let all = try await seriesLists()
+        if let shownSeries, shownSeries.fetchedAt == all.fetchedAt { return shownSeries }
+        let kept = languages.shown(all.titles.map { ($0.name, $0.year, $0.tag) }).map { all.titles[$0] }
+        let lists = XtreamVODLists(titles: kept, categories: Self.holding(all.categories, kept.map(\.categoryId)),
+                                   fetchedAt: all.fetchedAt)
+        shownSeries = lists
+        return lists
+    }
+
+    private static func holding(_ categories: [XtreamVODCategory], _ ids: [String?]) -> [XtreamVODCategory] {
+        let used = Set(ids.compactMap { $0 })
+        return categories.filter { used.contains($0.id) }
+    }
+
+    /// The languages both lists carry, most common first.
+    func availableOrigins() async -> [(origin: String, count: Int)] {
+        let movieTags = (try? await movieLists().titles.map(\.tag)) ?? []
+        let seriesTags = (try? await seriesLists().titles.map(\.tag)) ?? []
+        return XtreamVODLanguages.available(movieTags + seriesTags)
+    }
+
     init(service: XtreamService, sourceID: String, directory: URL? = XtreamVODCatalog.defaultDirectory) {
         self.service = service
         self.sourceID = sourceID
@@ -118,25 +166,25 @@ actor XtreamVODCatalog {
 
     /// One page of a library in `sort` order.
     func moviePage(sort: SortOption, page: Page) async throws -> (items: [XtreamMovie], total: Int) {
-        let lists = try await movieLists()
+        let lists = try await shownMovieLists()
         let order = self.order(.movies, lists.fetchedAt, sort) { lists.titles.map(XtreamVODMapping.sortable) }
         return (Self.slice(order, page).map { lists.titles[$0] }, order.count)
     }
 
     func seriesPage(sort: SortOption, page: Page) async throws -> (items: [XtreamSeries], total: Int) {
-        let lists = try await seriesLists()
+        let lists = try await shownSeriesLists()
         let order = self.order(.series, lists.fetchedAt, sort) { lists.titles.map(XtreamVODMapping.sortable) }
         return (Self.slice(order, page).map { lists.titles[$0] }, order.count)
     }
 
     func searchMovies(_ query: String, limit: Int) async throws -> [XtreamMovie] {
-        let lists = try await movieLists()
+        let lists = try await shownMovieLists()
         let names = searchNames(.movies, lists.fetchedAt) { lists.titles.map(\.name) }
         return XtreamVODMapping.search(query, in: names, limit: limit).map { lists.titles[$0] }
     }
 
     func searchSeries(_ query: String, limit: Int) async throws -> [XtreamSeries] {
-        let lists = try await seriesLists()
+        let lists = try await shownSeriesLists()
         let names = searchNames(.series, lists.fetchedAt) { lists.titles.map(\.name) }
         return XtreamVODMapping.search(query, in: names, limit: limit).map { lists.titles[$0] }
     }
@@ -146,12 +194,12 @@ actor XtreamVODCatalog {
         let names: [String]
         switch library {
         case .movies:
-            let lists = try await movieLists()
+            let lists = try await shownMovieLists()
             fetchedAt = lists.fetchedAt
             if let letters = fresh(library, fetchedAt).letters { return letters }
             names = lists.titles.map(\.name)
         case .series:
-            let lists = try await seriesLists()
+            let lists = try await shownSeriesLists()
             fetchedAt = lists.fetchedAt
             if let letters = fresh(library, fetchedAt).letters { return letters }
             names = lists.titles.map(\.name)

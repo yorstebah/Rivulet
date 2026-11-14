@@ -349,6 +349,18 @@ enum SettingsDescriptorStore {
             icon: "film.stack",
             description: "The provider's films and series, as Movies and TV Shows libraries in the sidebar and on Home. Off leaves only its channels."
         ),
+        "src_vodLanguages": SettingDescriptor(
+            icon: "globe",
+            description: "The languages of this provider's films and series you see. Each title shows once, in the first of your languages it has."
+        ),
+        "lang_all": SettingDescriptor(
+            icon: "globe",
+            description: "Every copy of every title, as the provider lists them."
+        ),
+        "lang_defaults": SettingDescriptor(
+            icon: "arrow.counterclockwise",
+            description: "Multi first, then your device's languages, then English."
+        ),
         "src_tmdbKey": SettingDescriptor(
             icon: "info.circle",
             description: "Your own free key from themoviedb.org. With it, film and series pages show the plot in your language and the cast with photos."
@@ -695,6 +707,7 @@ enum SettingsDescriptorStore {
         case .contentFilterWords: return ("text.badge.plus", .systemOrange)
         case .liveTVSourceDetail: return ("tv.and.mediabox", .systemBlue)
         case .liveTVFavorites: return ("star.fill", .systemYellow)
+        case .xtreamLanguages: return ("globe", .systemBlue)
         case .addLiveTVSource: return ("plus.circle.fill", .systemBlue)
         case .addXtream: return ("person.badge.key.fill", .systemIndigo)
         case .addDispatcharr: return ("antenna.radiowaves.left.and.right", .systemBlue)
