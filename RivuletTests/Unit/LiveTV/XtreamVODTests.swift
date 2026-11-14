@@ -188,4 +188,14 @@ final class XtreamVODTests: XCTestCase {
         XCTAssertEqual(XtreamService.splitYear("Mutronics (1991) (VF)").year, 1991)
         XCTAssertEqual(XtreamService.splitYear(XtreamService.cleanName("┃GR┃ Human.Vapor [ガス人間 ](2026)")).year, 2026)
     }
+
+    func test_episodeTitle_withoutTagsShowAndNumber() {
+        XCTAssertEqual(XtreamVODMapping.episodeTitle("| LINGO |   Breaking Bad - S01E01 - Pilot"), "Pilot")
+        XCTAssertEqual(XtreamVODMapping.episodeTitle("┃NL┃ S.W.A.T. - S02E10 - Fallen"), "Fallen")
+        XCTAssertEqual(XtreamVODMapping.episodeTitle("The Wire S1E3 The Buys"), "The Buys")
+        XCTAssertEqual(XtreamVODMapping.episodeTitle("Breaking Bad - S01E01"), nil)
+        XCTAssertEqual(XtreamVODMapping.episodeTitle("Pilot"), "Pilot")
+        XCTAssertEqual(XtreamVODMapping.episodeTitle("CSI: Miami"), "CSI: Miami")
+        XCTAssertNil(XtreamVODMapping.episodeTitle(""))
+    }
 }

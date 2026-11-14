@@ -163,6 +163,19 @@ nonisolated enum XtreamVODMapping {
             libraryID: XtreamVODLibrary.series.rawValue)
     }
 
+    /// An episode's own title, as panels send it ("| LINGO | Breaking Bad - S01E01 - Pilot"):
+    /// without the tags in front and the show and number before it ("Pilot"). nil when nothing
+    /// else is left, so the row reads "Episode 1".
+    static func episodeTitle(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        var title = XtreamService.cleanName(raw)
+        let numbered = #"^(?:.*?[\s\-–|:.]+)?S\d{1,3}\s*[\.\-]?\s*E\d{1,4}(?:\s*[\-–|:.]\s*|\s+|$)"#
+        if let match = title.range(of: numbered, options: [.regularExpression, .caseInsensitive]) {
+            title = String(title[match.upperBound...]).trimmingCharacters(in: .whitespaces)
+        }
+        return title.isEmpty ? nil : title
+    }
+
     static func item(_ episode: XtreamEpisode, of series: XtreamSeries, provider: String,
                      state: State) -> MediaItem {
         let showRef = MediaItemRef(providerID: provider, itemID: XtreamVODID.series(series.id).itemID)
@@ -170,7 +183,7 @@ nonisolated enum XtreamVODMapping {
                                      itemID: XtreamVODID.season(seriesID: series.id, number: episode.season).itemID)
         let seriesArt = MediaArtwork(poster: series.coverURL, backdrop: series.backdropURL,
                                      thumbnail: series.coverURL, logo: nil)
-        let title = episode.title.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Episode \(episode.number)")
+        let title = episodeTitle(episode.title) ?? String(localized: "Episode \(episode.number)")
         return MediaItem(
             ref: MediaItemRef(providerID: provider,
                               itemID: XtreamVODID.episode(seriesID: series.id, episodeID: episode.id).itemID),
