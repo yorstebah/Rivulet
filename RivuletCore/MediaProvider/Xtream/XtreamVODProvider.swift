@@ -345,12 +345,14 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         case .movie(let movieID):
             return try await movieDetail(movieID)
         case .series(let seriesID):
-            let (series, _) = try await seriesAndInfo(seriesID)
+            let (series, info) = try await seriesAndInfo(seriesID)
             let episodes = try await episodes(of: seriesID)
-            let detail = Self.detail(XtreamVODMapping.item(series, provider: id, state: state),
+            var detail = Self.detail(XtreamVODMapping.item(series, provider: id, state: state),
                                      genres: XtreamVODMapping.genres(series.genre),
                                      nextEpisode: XtreamVODMapping.nextEpisode(episodes))
-            guard let found = await tmdb.title(.tv, tmdbID: nil, name: series.name, year: series.year) else { return detail }
+            // The panel's id, for Trakt and the marker databases even without a TMDB key.
+            if let tmdbID = info.tmdbId { detail.externalIDs = ["tmdb": tmdbID] }
+            guard let found = await tmdb.title(.tv, tmdbID: info.tmdbId, name: series.name, year: series.year) else { return detail }
             return XtreamVODMapping.enriched(detail, with: found)
         case .season(let seriesID, let number):
             let (series, info) = try await seriesAndInfo(seriesID)
@@ -476,9 +478,12 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
 
     private func communityExtras(seriesID: String, episodeID: String) async -> PlaybackExtras {
         guard let (series, info) = try? await seriesAndInfo(seriesID),
-              let episode = info.episodes.first(where: { $0.id == episodeID }), episode.number > 0,
-              let tmdbID = await tmdb.title(.tv, tmdbID: nil, name: series.name, year: series.year)?.id
-        else { return PlaybackExtras() }
+              let episode = info.episodes.first(where: { $0.id == episodeID }), episode.number > 0 else { return PlaybackExtras() }
+        // The panel's TMDB id when it gives one (most do), else the viewer's TMDB key finds it.
+        var tmdbID = info.tmdbId.flatMap { Int($0) }
+        if tmdbID == nil { tmdbID = await tmdb.title(.tv, tmdbID: nil, name: series.name, year: series.year)?.id }
+        guard let tmdbID else { return PlaybackExtras() }
+        // introdb.app wants the IMDb id, which only the key can find; TheIntroDB.org takes TMDB's.
         let ids = CommunityShowIDs(imdb: await tmdb.imdbID(.tv, tmdbID: tmdbID), tmdb: tmdbID)
         let markers = await communityMarkers(ids, episode.season, episode.number, episode.duration)
         return PlaybackExtras(markers: PlexPlaybackMarkers.playbackMarkers(markers))

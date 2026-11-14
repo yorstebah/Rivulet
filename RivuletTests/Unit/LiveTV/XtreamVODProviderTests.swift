@@ -354,6 +354,26 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertEqual(extras.markers, [PlaybackMarker(kind: .intro, start: 30, end: 95)])
     }
 
+    func test_episodeMarkers_withoutATMDBKey_useThePanelsTMDBID() async {
+        FakePanel.replies["get_series_info"] = FakePanel.replies["get_series_info"]!
+            .replacingOccurrences(of: #"{"seasons""#, with: #"{"info": {"name": "The Wire", "tmdb": "1438"}, "seasons""#)
+        let store = store!
+        let asked = OSAllocatedUnfairLock(initialState: [String]())
+        let provider = XtreamVODProvider(
+            sourceID: source, displayName: "IPTV", account: account, cacheDirectory: directory, session: session(),
+            tmdb: TMDBLookup(apiKey: { nil }), watchStore: { store },
+            communityMarkers: { ids, season, episode, _ in
+                asked.withLock { $0.append("\(ids.imdb ?? "-") \(ids.tmdb ?? 0) S\(season)E\(episode)") }
+                return [PlexMarker(id: -9011, type: "intro", startTimeOffset: 1_000, endTimeOffset: 50_000)]
+            },
+            usesCommunityMarkers: { true })
+        let extras = await provider.playbackExtras(for: ref(.episode(seriesID: "70", episodeID: "701")), sourceID: nil)
+        XCTAssertEqual(asked.withLock { $0 }, ["- 1438 S1E1"])
+        XCTAssertEqual(extras.markers.map(\.kind), [.intro])
+        let detail = try? await provider.fullDetail(for: ref(.series("70")))
+        XCTAssertEqual(detail?.externalIDs["tmdb"], "1438")
+    }
+
     func test_noMarkers_withoutTheOptIn_orForAFilm() async {
         let asked = OSAllocatedUnfairLock(initialState: [String]())
         let off = await markerProvider(optedIn: false, asked: asked)

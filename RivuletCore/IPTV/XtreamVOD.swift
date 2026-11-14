@@ -90,6 +90,8 @@ nonisolated struct XtreamEpisode: Sendable, Equatable {
 nonisolated struct XtreamSeriesInfo: Sendable, Equatable {
     let seasons: [XtreamSeason]
     let episodes: [XtreamEpisode]
+    /// The show's TMDB id, when the panel gives one (`info.tmdb`).
+    var tmdbId: String? = nil
 }
 
 extension XtreamService {
@@ -266,7 +268,9 @@ extension XtreamService {
         seasons = seasons.filter { withEpisodes.contains($0.number) }.sorted { $0.number < $1.number }
         var seenSeasons = Set<Int>()
         seasons = seasons.filter { seenSeasons.insert($0.number).inserted }
-        return XtreamSeriesInfo(seasons: seasons, episodes: episodes)
+        let info = root["info"] as? [String: Any] ?? [:]
+        let tmdb = (string(info["tmdb"]) ?? string(info["tmdb_id"])).flatMap { Int($0).map(String.init) }
+        return XtreamSeriesInfo(seasons: seasons, episodes: episodes, tmdbId: tmdb)
     }
 
     // MARK: Field helpers
