@@ -351,7 +351,7 @@ enum SettingsDescriptorStore {
         ),
         "src_vodLanguages": SettingDescriptor(
             icon: "globe",
-            description: "The languages of this provider's films and series you see. Each title shows once, in the first of your languages it has."
+            description: "For IPTV films and series, listed once per language. Each title shows once, in the first of your languages. Plex, Jellyfin and Emby follow Audio Language."
         ),
         "lang_all": SettingDescriptor(
             icon: "globe",

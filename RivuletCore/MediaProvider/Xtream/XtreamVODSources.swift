@@ -33,53 +33,77 @@ enum XtreamVODSources {
 
     // MARK: - Languages
 
-    /// Each source's languages (`XtreamVODLanguages`), by source id. A source not listed keeps the
-    /// defaults, which follow the device's languages. Synced: a source has one id everywhere.
-    static let languagesKey = "xtreamVODLanguages"
+    /// The viewer's film and series languages (`XtreamVODLanguages`), for every Xtream source: a
+    /// playback choice, as Audio Language is. Unset keeps the defaults, which follow the device's
+    /// languages. Synced.
+    static let languagesKey = "xtreamVODContentLanguages"
+    /// One language every listing is narrowed to from a library ("Show: English"); Home,
+    /// libraries, collections, search and For You follow until it is cleared. Synced.
+    static let languageFocusKey = "xtreamVODLanguageChoice"
+    /// The first build kept languages per source; the first source's carry over.
+    private static let legacyLanguagesKey = "xtreamVODLanguages"
 
-    static func languages(for sourceID: String, defaults: UserDefaults = .standard) -> XtreamVODLanguages {
-        let saved = defaults.dictionary(forKey: languagesKey) as? [String: [String]]
-        return saved?[sourceID].map(XtreamVODLanguages.init(origins:)) ?? .defaults()
+    static func languages(defaults: UserDefaults = .standard) -> XtreamVODLanguages {
+        if let saved = defaults.stringArray(forKey: languagesKey) { return XtreamVODLanguages(origins: saved) }
+        if let legacy = (defaults.dictionary(forKey: legacyLanguagesKey) as? [String: [String]])?
+            .sorted(by: { $0.key < $1.key }).first?.value {
+            return XtreamVODLanguages(origins: legacy)
+        }
+        return .defaults()
     }
 
-    static func setLanguages(_ languages: XtreamVODLanguages, for sourceID: String, defaults: UserDefaults = .standard) {
-        var saved = defaults.dictionary(forKey: languagesKey) as? [String: [String]] ?? [:]
-        saved[sourceID] = languages.origins
-        defaults.set(saved, forKey: languagesKey)
-        onChanged?()
-        NotificationCenter.default.post(name: languagesChanged, object: nil)
+    static func setLanguages(_ languages: XtreamVODLanguages, defaults: UserDefaults = .standard) {
+        defaults.set(languages.origins, forKey: languagesKey)
+        defaults.removeObject(forKey: legacyLanguagesKey)
+        changed()
     }
 
-    /// One language the viewer narrowed a source to from its libraries ("Show: English"), by
-    /// source id: Home, libraries, collections, search and For You follow until it is cleared.
-    /// Synced, as the languages are.
-    static let languageFocusKey = "xtreamVODLanguageFocus"
-
-    static func languageFocus(for sourceID: String, defaults: UserDefaults = .standard) -> String? {
-        (defaults.dictionary(forKey: languageFocusKey) as? [String: String])?[sourceID]
+    static func languageFocus(defaults: UserDefaults = .standard) -> String? {
+        defaults.string(forKey: languageFocusKey)
     }
 
-    static func setLanguageFocus(_ language: String?, for sourceID: String, defaults: UserDefaults = .standard) {
-        var saved = defaults.dictionary(forKey: languageFocusKey) as? [String: String] ?? [:]
-        saved[sourceID] = language
-        defaults.set(saved, forKey: languageFocusKey)
-        onChanged?()
-        NotificationCenter.default.post(name: languagesChanged, object: nil)
+    static func setLanguageFocus(_ language: String?, defaults: UserDefaults = .standard) {
+        defaults.set(language, forKey: languageFocusKey)
+        changed()
     }
 
-    /// What a source shows: its languages, narrowed to the focused one when there is one.
-    static func shownLanguages(for sourceID: String) -> XtreamVODLanguages {
-        let languages = self.languages(for: sourceID)
-        guard let focus = languageFocus(for: sourceID) else { return languages }
-        return languages.focused(on: focus, available: availableOrigins[sourceID]?.map(\.origin) ?? [])
+    /// What the listings show: the viewer's languages, narrowed to the chosen one when there is one.
+    static func shownLanguages() -> XtreamVODLanguages {
+        let languages = self.languages()
+        guard let focus = languageFocus() else { return languages }
+        return languages.focused(on: focus, available: allAvailableOrigins.map(\.origin))
     }
 
-    /// Posted when a source's languages or focus change, for screens that list its titles.
+    /// Posted when the languages or the chosen one change, for screens that list titles.
     static let languagesChanged = Notification.Name("XtreamVODSources.languagesChanged")
 
-    /// The languages a source's titles carry, most common first, once its lists have loaded:
+    private static func changed() {
+        onChanged?()
+        NotificationCenter.default.post(name: languagesChanged, object: nil)
+    }
+
+    /// The languages each source's titles carry, most common first, once its lists have loaded:
     /// what Settings offers. In memory only.
     static var availableOrigins: [String: [(origin: String, count: Int)]] = [:]
+
+    /// Every source's languages together.
+    static var allAvailableOrigins: [(origin: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for entry in availableOrigins.values.joined() { counts[entry.origin, default: 0] += entry.count }
+        return counts.map { ($0.key, $0.value) }.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }
+    }
+
+    /// Whether any Xtream source shows films and series: only then do the language settings show.
+    static func offersLanguages(store: LiveTVDataStore? = nil) -> Bool {
+        (store ?? .shared).xtreamSources.contains { isEnabled($0.id) }
+    }
+
+    /// Loads each source's lists once, for the languages Settings offers.
+    static func loadAvailableOrigins() async {
+        for provider in providers() where availableOrigins[provider.id] == nil {
+            _ = try? await provider.libraries()
+        }
+    }
 
     private static var built: [String: (account: XtreamAccount, name: String, provider: XtreamVODProvider)] = [:]
 

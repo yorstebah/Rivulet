@@ -19,6 +19,11 @@ struct MacSettingsView: View {
                 .tabItem { Label("Library", systemImage: "rectangle.stack") }
             MacPlaybackSettingsView()
                 .tabItem { Label("Playback", systemImage: "play.rectangle") }
+            // Which copies of an Xtream provider's films and series show, for Home and every library.
+            if XtreamVODSources.offersLanguages() {
+                MacContentLanguagesView()
+                    .tabItem { Label("Languages", systemImage: "globe") }
+            }
             MacPhotoSettingsView()
                 .tabItem { Label("Photos", systemImage: "photo.on.rectangle") }
             // Sources and server choice are the owner's, not a restricted profile's.

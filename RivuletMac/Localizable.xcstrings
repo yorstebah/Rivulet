@@ -8,6 +8,7 @@
     "Asia" : {},
     "Choices of one kind widen the list; different kinds narrow it." : {},
     "Choose at least one rule." : {},
+    "Content Languages" : {},
     "Country or Language" : {},
     "Delete Smart List" : {},
     "Delete Smart List?" : {},
@@ -189,6 +190,7 @@
       }
     },
     "Words, separated by commas" : {},
+    "Your IPTV provider lists films and series once per language. Each title shows once, in the first of your languages it has. Plex, Jellyfin and Emby list a title once with all its languages: Audio Language and Subtitle Language choose there." : {},
     "Z to A" : {
       "localizations" : {
         "de" : {

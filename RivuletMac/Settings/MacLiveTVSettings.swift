@@ -200,86 +200,6 @@ private struct MacLiveSourceDetailSheet: View {
     }
 }
 
-/// A source's film and series languages: All Languages, then each language its titles carry,
-/// the chosen ones first in order of preference (the first chosen is the copy shown when a title
-/// has several). Logic: `XtreamVODLanguages`, as on tvOS.
-private struct MacXtreamLanguagesView: View {
-    let sourceId: String
-    @State private var languages = XtreamVODLanguages.everything
-    @State private var available: [(origin: String, count: Int)] = []
-
-    var body: some View {
-        List {
-            Section {
-                row(title: String(localized: "All Languages"), count: nil, selected: languages.showsEverything) {
-                    update(.everything)
-                }
-            }
-            Section {
-                ForEach(order, id: \.self) { language in
-                    row(title: XtreamVODLanguages.name(ofLanguage: language),
-                        count: counts.first { $0.language == language }?.count,
-                        selected: languages.languages.contains(language)) {
-                        var next = languages
-                        let origins = XtreamVODLanguages.origins(ofLanguage: language, available: available.map(\.origin))
-                        if next.languages.contains(language) {
-                            next.origins.removeAll(where: Set(origins).contains)
-                        } else {
-                            next.origins += origins.filter { !next.origins.contains($0) }
-                        }
-                        update(next)
-                    }
-                }
-                if available.isEmpty { ProgressView() }
-            } footer: {
-                Text("Each title shows once, in the first of your languages it has.")
-            }
-            Section {
-                Button("Restore Defaults") { update(.defaults()) }
-            } footer: {
-                Text("Multi first, then your device's languages, then English.")
-            }
-        }
-        .navigationTitle("Languages")
-        .task {
-            languages = XtreamVODSources.languages(for: sourceId)
-            if XtreamVODSources.availableOrigins[sourceId] == nil,
-               let provider = XtreamVODSources.providers().first(where: { $0.id == sourceId }) {
-                _ = try? await provider.libraries()
-            }
-            available = XtreamVODSources.availableOrigins[sourceId] ?? []
-        }
-    }
-
-    private var counts: [(language: String, count: Int)] { XtreamVODLanguages.languageCounts(available) }
-
-    /// The chosen languages in order of preference, then the rest by how many titles they hold.
-    private var order: [String] {
-        let carried = Set(counts.map(\.language))
-        return languages.languages.filter { carried.contains($0) || available.isEmpty }
-            + counts.map(\.language).filter { !languages.languages.contains($0) }
-    }
-
-    private func update(_ next: XtreamVODLanguages) {
-        languages = next
-        XtreamVODSources.setLanguages(next, for: sourceId)
-    }
-
-    private func row(title: String, count: Int?, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(verbatim: title).foregroundStyle(.primary)
-                Spacer()
-                if let count { Text(count, format: .number).foregroundStyle(.secondary) }
-                Image(systemName: "checkmark").foregroundStyle(.tint).opacity(selected ? 1 : 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
 /// An Xtream source's films and series: the switch, and the TMDB key their detail pages use.
 private struct MacXtreamVODSection: View {
     let sourceId: String
@@ -290,13 +210,6 @@ private struct MacXtreamVODSection: View {
         Section {
             Toggle("Movies and TV Shows", isOn: $enabled)
                 .onChange(of: enabled) { _, on in XtreamVODSources.setEnabled(on, for: sourceId) }
-            if enabled {
-                NavigationLink {
-                    MacXtreamLanguagesView(sourceId: sourceId)
-                } label: {
-                    LabeledContent("Languages", value: XtreamVODSources.languages(for: sourceId).summary)
-                }
-            }
             SecureField("TMDB API Key", text: $tmdbKey)
                 .autocorrectionDisabled()
                 .onSubmit(saveKey)

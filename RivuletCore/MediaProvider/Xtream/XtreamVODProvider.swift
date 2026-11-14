@@ -129,25 +129,25 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         return await MainActor.run {
             let available = XtreamVODSources.availableOrigins[id] ?? []
             let carried = Set(available.map { XtreamVODLanguages.language(of: $0.origin) })
-            let preferred = XtreamVODSources.languages(for: id)
+            let preferred = XtreamVODSources.languages()
             let ids = preferred.showsEverything
                 ? XtreamVODLanguages.languageCounts(available).map(\.language)
                 : preferred.languages.filter(carried.contains)
             guard ids.count > 1 else { return nil }
             return LibraryLanguageChoices(
                 languages: ids.map { LibraryLanguage(id: $0, name: XtreamVODLanguages.name(ofLanguage: $0)) },
-                selected: XtreamVODSources.languageFocus(for: id))
+                selected: XtreamVODSources.languageFocus())
         }
     }
 
     func setLanguage(_ language: String?) async {
-        await MainActor.run { XtreamVODSources.setLanguageFocus(language, for: id) }
+        await MainActor.run { XtreamVODSources.setLanguageFocus(language) }
         await applyLanguages()
     }
 
     /// Brings the catalogue to the viewer's languages for this source; nothing when unchanged.
     private func applyLanguages() async {
-        let languages = await MainActor.run { XtreamVODSources.shownLanguages(for: id) }
+        let languages = await MainActor.run { XtreamVODSources.shownLanguages() }
         await catalog.setLanguages(languages)
     }
 
@@ -514,7 +514,7 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     func forYouHub(in library: MediaLibrary, now: Date = Date()) async -> MediaHub? {
         guard let kind = XtreamVODLibrary(rawValue: library.id) else { return nil }
         await applyLanguages()
-        let languages = await MainActor.run { XtreamVODSources.shownLanguages(for: id) }
+        let languages = await MainActor.run { XtreamVODSources.shownLanguages() }
         let state = await state()
         let seeds = XtreamForYou.seeds(state, source: id, library: kind, now: now)
         guard !seeds.isEmpty else { return nil }

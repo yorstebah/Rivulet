@@ -4657,9 +4657,11 @@
         }
       }
     },
+    "Content Languages" : {},
     "Country or Language" : {},
     "Every copy of every title, as the provider lists them." : {},
     "Ex-Yugoslav" : {},
+    "For IPTV films and series, listed once per language. Each title shows once, in the first of your languages. Plex, Jellyfin and Emby follow Audio Language." : {},
     "International" : {},
     "Loading Languages…" : {},
     "Movies and TV Shows" : {},

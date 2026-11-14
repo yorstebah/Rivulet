@@ -45,6 +45,18 @@ struct IOSAccountView: View {
                     } label: {
                         Label("Playback", systemImage: "play.rectangle")
                     }
+                    // Which copies of an Xtream provider's films and series show, for Home and every library.
+                    if XtreamVODSources.offersLanguages() {
+                        NavigationLink {
+                            IOSContentLanguagesView()
+                        } label: {
+                            LabeledContent {
+                                Text(XtreamVODSources.languages().summary)
+                            } label: {
+                                Label("Content Languages", systemImage: "globe")
+                            }
+                        }
+                    }
                     NavigationLink {
                         IOSPhotoSettingsView()
                     } label: {

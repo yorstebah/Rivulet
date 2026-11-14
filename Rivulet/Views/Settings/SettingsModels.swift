@@ -74,7 +74,7 @@ enum SettingsPage: Hashable, CaseIterable {
         case .iptv: return String(localized: "Live TV Sources")
         case .liveTVSourceDetail: return String(localized: "Source Details")
         case .liveTVFavorites: return String(localized: "Favorites")
-        case .xtreamLanguages: return String(localized: "Languages")
+        case .xtreamLanguages: return String(localized: "Content Languages")
         case .addLiveTVSource: return String(localized: "Add a Source")
         case .addXtream: return String(localized: "Xtream Codes")
         case .addDispatcharr: return String(localized: "Dispatcharr")
