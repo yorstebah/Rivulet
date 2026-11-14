@@ -32,12 +32,20 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     let tmdb: TMDBLookup
     /// Where watch state is kept; tests pass their own.
     private let watchStore: @MainActor @Sendable () -> XtreamWatchProgressStore
+    /// Skip markers for an episode from IntroDB (show IMDb id, season, episode); tests pass their own.
+    private let communityMarkers: @Sendable (String, Int, Int) async -> [PlexMarker]
+    /// The "Community Marker Database" opt-in, read at each episode.
+    private let usesCommunityMarkers: @Sendable () -> Bool
 
     /// `sourceID` is the Live TV source's ("xtream:<hash>"), which is also a valid provider id.
     init(sourceID: String, displayName: String, account: XtreamAccount,
          cacheDirectory: URL? = XtreamVODCatalog.defaultDirectory, session: URLSession? = nil,
          tmdb: TMDBLookup? = nil,
-         watchStore: @escaping @MainActor @Sendable () -> XtreamWatchProgressStore = { .shared }) {
+         watchStore: @escaping @MainActor @Sendable () -> XtreamWatchProgressStore = { .shared },
+         communityMarkers: @escaping @Sendable (String, Int, Int) async -> [PlexMarker] = {
+             await IntroDBClient().markers(imdbID: $0, season: $1, episode: $2)
+         },
+         usesCommunityMarkers: @escaping @Sendable () -> Bool = { UserDefaults.standard.bool(forKey: "useIntroDB") }) {
         self.id = sourceID
         self.displayName = displayName
         let service = XtreamService(account: account, session: session)
@@ -45,6 +53,8 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         self.catalog = XtreamVODCatalog(service: service, sourceID: sourceID, directory: cacheDirectory)
         self.watchStore = watchStore
         self.tmdb = tmdb ?? .shared
+        self.communityMarkers = communityMarkers
+        self.usesCommunityMarkers = usesCommunityMarkers
     }
 
     // MARK: - Watch state
@@ -444,6 +454,31 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let runtime = runtimes.withLock { $0[itemRef.itemID] }
         return StreamInfo(source: Self.source(runtime: runtime, container: container, url: url), playSessionID: nil,
                           trackInfoAvailable: false, headers: LiveTVClientIdentity.streamHeaders)
+    }
+
+    // MARK: - Skip markers
+
+    /// Intro, recap and credits for an episode from IntroDB, which a panel never has. Opt-in
+    /// ("useIntroDB"), and it needs the viewer's TMDB key: IntroDB looks up by the show's IMDb
+    /// id, found through the series' TMDB match (the one its detail page uses, so cached).
+    /// Held to `markerBudget`: iPhone and Mac wait for markers before playing.
+    func playbackExtras(for itemRef: MediaItemRef, sourceID: String?) async -> PlaybackExtras {
+        guard usesCommunityMarkers(),
+              case .episode(let seriesID, let episodeID) = XtreamVODID(itemID: itemRef.itemID) else { return PlaybackExtras() }
+        let lookup = Task { await self.communityExtras(seriesID: seriesID, episodeID: episodeID) }
+        return await Self.value(of: lookup, within: Self.markerBudget) ?? PlaybackExtras()
+    }
+
+    /// Seconds a marker lookup may take before playback goes on without markers.
+    static let markerBudget: Double = 6
+
+    private func communityExtras(seriesID: String, episodeID: String) async -> PlaybackExtras {
+        guard let (series, info) = try? await seriesAndInfo(seriesID),
+              let episode = info.episodes.first(where: { $0.id == episodeID }), episode.number > 0,
+              let tmdbID = await tmdb.title(.tv, tmdbID: nil, name: series.name, year: series.year)?.id,
+              let imdbID = await tmdb.imdbID(.tv, tmdbID: tmdbID) else { return PlaybackExtras() }
+        let markers = await communityMarkers(imdbID, episode.season, episode.number)
+        return PlaybackExtras(markers: PlexPlaybackMarkers.playbackMarkers(markers))
     }
 
     func setSelectedAudioTrack(_ trackID: String, source sourceID: String, of itemRef: MediaItemRef) async throws {}

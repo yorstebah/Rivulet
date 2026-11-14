@@ -11,6 +11,7 @@
 //
 
 import XCTest
+import os
 @testable import Rivulet
 
 /// Answers `player_api.php` by its `action`, and counts the requests.
@@ -25,7 +26,7 @@ private final class FakePanel: URLProtocol {
 
     override func startLoading() {
         let action = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
-            .queryItems?.first { $0.name == "action" }?.value ?? ""
+            .queryItems?.first { $0.name == "action" }?.value ?? (request.url?.path ?? "")
         Self.requests.append(action)
         guard !Self.failing, let body = Self.replies[action], let url = request.url else {
             client?.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost))
@@ -325,5 +326,42 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertEqual(found.map(\.title), ["The Wire"])
         let up = try await provider().search("up")
         XCTAssertEqual(up.map(\.kind), [.movie])
+    }
+
+    // MARK: - Skip markers
+
+    private func markerProvider(optedIn: Bool, asked: OSAllocatedUnfairLock<[String]>) -> XtreamVODProvider {
+        let store = store!
+        FakePanel.replies["/3/search/tv"] = #"{"results": [{"id": 1438, "name": "The Wire", "first_air_date": "2002-06-02"}]}"#
+        FakePanel.replies["/3/tv/1438"] = #"{"id": 1438, "name": "The Wire"}"#
+        FakePanel.replies["/3/tv/1438/external_ids"] = #"{"imdb_id": "tt0306414"}"#
+        let tmdb = TMDBLookup(apiKey: { "0123456789abcdef0123456789abcdef" }, session: session(), language: "en-US")
+        return XtreamVODProvider(
+            sourceID: source, displayName: "IPTV", account: account, cacheDirectory: directory, session: session(),
+            tmdb: tmdb, watchStore: { store },
+            communityMarkers: { imdb, season, episode in
+                asked.withLock { $0.append("\(imdb) S\(season)E\(episode)") }
+                return [PlexMarker(id: -9001, type: "intro", startTimeOffset: 30_000, endTimeOffset: 95_000)]
+            },
+            usesCommunityMarkers: { optedIn })
+    }
+
+    func test_episodeMarkers_comeFromIntroDB_byTheShowsIMDbID() async {
+        let asked = OSAllocatedUnfairLock(initialState: [String]())
+        let extras = await markerProvider(optedIn: true, asked: asked)
+            .playbackExtras(for: ref(.episode(seriesID: "70", episodeID: "702")), sourceID: nil)
+        XCTAssertEqual(asked.withLock { $0 }, ["tt0306414 S1E2"])
+        XCTAssertEqual(extras.markers, [PlaybackMarker(kind: .intro, start: 30, end: 95)])
+    }
+
+    func test_noMarkers_withoutTheOptIn_orForAFilm() async {
+        let asked = OSAllocatedUnfairLock(initialState: [String]())
+        let off = await markerProvider(optedIn: false, asked: asked)
+            .playbackExtras(for: ref(.episode(seriesID: "70", episodeID: "701")), sourceID: nil)
+        let film = await markerProvider(optedIn: true, asked: asked)
+            .playbackExtras(for: ref(.movie("10")), sourceID: nil)
+        XCTAssertTrue(off.markers.isEmpty)
+        XCTAssertTrue(film.markers.isEmpty)
+        XCTAssertTrue(asked.withLock { $0 }.isEmpty)
     }
 }

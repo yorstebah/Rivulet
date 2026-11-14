@@ -113,4 +113,17 @@ final class TMDBLookupTests: XCTestCase {
         XCTAssertEqual(enriched.cast.map(\.name), ["Al Pacino"])
         XCTAssertEqual(enriched.externalIDs["tmdb"], "949")
     }
+
+    func test_imdbID_fromExternalIDs_keptForTheSession() async {
+        FakeTMDB.replies["/3/tv/1438/external_ids"] = #"{"imdb_id": "tt0306414", "tvdb_id": 79126}"#
+        FakeTMDB.replies["/3/tv/2/external_ids"] = #"{"imdb_id": ""}"#
+        let lookup = lookup()
+        let first = await lookup.imdbID(.tv, tmdbID: 1438)
+        let again = await lookup.imdbID(.tv, tmdbID: 1438)
+        let none = await lookup.imdbID(.tv, tmdbID: 2)
+        XCTAssertEqual(first, "tt0306414")
+        XCTAssertEqual(again, "tt0306414")
+        XCTAssertNil(none)
+        XCTAssertEqual(FakeTMDB.requests.filter { $0.url?.path == "/3/tv/1438/external_ids" }.count, 1)
+    }
 }

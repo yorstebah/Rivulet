@@ -63,6 +63,7 @@ actor TMDBLookup {
     private var cache: [String: TMDBTitle?] = [:]
     private var recommendationCache: [String: [TMDBRecommendation]] = [:]
     private var languageCache: [String: String?] = [:]
+    private var imdbCache: [String: String?] = [:]
 
     init(apiKey: @escaping @Sendable () async -> String?, session: URLSession = .shared,
          language: String = Locale.preferredLanguages.first ?? "en-US") {
@@ -101,6 +102,19 @@ actor TMDBLookup {
               let results = json["results"] as? [[String: Any]] else { return [] }
         let found = Self.recommendations(results, kind: kind)
         recommendationCache[cacheKey] = found
+        return found
+    }
+
+    /// A title's IMDb id ("tt0306414") from TMDB's external ids, kept for the session.
+    /// nil without a key, an answer, or an id. IntroDB looks skip markers up by it.
+    func imdbID(_ kind: Kind, tmdbID: Int) async -> String? {
+        guard let key = await apiKey(), !key.isEmpty else { return nil }
+        let cacheKey = "\(kind.rawValue)|\(tmdbID)"
+        if let known = imdbCache[cacheKey] { return known }
+        let json = await get("\(kind.rawValue)/\(tmdbID)/external_ids", [], key: key) as? [String: Any]
+        let found = (json?["imdb_id"] as? String).flatMap { $0.hasPrefix("tt") ? $0 : nil }
+        // Only an answer is kept: a dropped connection may find it next time.
+        if json != nil { imdbCache[cacheKey] = found }
         return found
     }
 
