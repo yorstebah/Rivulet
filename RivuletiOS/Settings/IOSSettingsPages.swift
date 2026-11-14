@@ -121,7 +121,7 @@ struct IOSPlaybackSettingsView: View {
             Section {
                 Toggle("Community Markers", isOn: $useIntroDB)
             } footer: {
-                Text("Fills in intro and credits markers that Plex is missing, from introdb.app. Only the show’s IMDb ID and episode number are sent.")
+                Text("Fills in intro, recap and credits markers your server is missing, from introdb.app and TheIntroDB.org. Only the show’s IMDb, TMDB or TVDB ID and the episode number are sent.")
             }
         }
         .navigationTitle("Playback")

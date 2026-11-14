@@ -339,18 +339,18 @@ final class XtreamVODProviderTests: XCTestCase {
         return XtreamVODProvider(
             sourceID: source, displayName: "IPTV", account: account, cacheDirectory: directory, session: session(),
             tmdb: tmdb, watchStore: { store },
-            communityMarkers: { imdb, season, episode in
-                asked.withLock { $0.append("\(imdb) S\(season)E\(episode)") }
+            communityMarkers: { ids, season, episode, _ in
+                asked.withLock { $0.append("\(ids.imdb ?? "-") \(ids.tmdb ?? 0) S\(season)E\(episode)") }
                 return [PlexMarker(id: -9001, type: "intro", startTimeOffset: 30_000, endTimeOffset: 95_000)]
             },
             usesCommunityMarkers: { optedIn })
     }
 
-    func test_episodeMarkers_comeFromIntroDB_byTheShowsIMDbID() async {
+    func test_episodeMarkers_comeFromTheDatabases_byTheShowsIDs() async {
         let asked = OSAllocatedUnfairLock(initialState: [String]())
         let extras = await markerProvider(optedIn: true, asked: asked)
             .playbackExtras(for: ref(.episode(seriesID: "70", episodeID: "702")), sourceID: nil)
-        XCTAssertEqual(asked.withLock { $0 }, ["tt0306414 S1E2"])
+        XCTAssertEqual(asked.withLock { $0 }, ["tt0306414 1438 S1E2"])
         XCTAssertEqual(extras.markers, [PlaybackMarker(kind: .intro, start: 30, end: 95)])
     }
 

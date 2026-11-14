@@ -276,26 +276,27 @@ final class PlexProviderPlaybackTests: XCTestCase {
         network.metadata["50"] = show
         let episode = try! JSONDecoder().decode(PlexMetadata.self, from: Data(
             #"{"ratingKey":"51","type":"episode","grandparentRatingKey":"50","parentIndex":2,"index":3}"#.utf8))
-        var asked: (String, Int, Int)?
+        let asked = OSAllocatedUnfairLock<(CommunityShowIDs, Int, Int)?>(initialState: nil)
         let markers = await PlexPlaybackMarkers.community(
             for: episode, serverURL: "http://s", token: "t", network: network
-        ) { imdb, season, number in
-            asked = (imdb, season, number)
+        ) { ids, season, number, _ in
+            asked.withLock { $0 = (ids, season, number) }
             return [PlexMarker(id: -9001, type: "intro", startTimeOffset: 0, endTimeOffset: 1000)]
         }
-        XCTAssertEqual(asked?.0, "tt0903747")
-        XCTAssertEqual(asked?.1, 2)
-        XCTAssertEqual(asked?.2, 3)
+        let seen = asked.withLock { $0 }
+        XCTAssertEqual(seen?.0.imdb, "tt0903747")
+        XCTAssertEqual(seen?.1, 2)
+        XCTAssertEqual(seen?.2, 3)
         XCTAssertEqual(markers.count, 1)
     }
 
     func test_community_movieDoesNotAsk() async {
         let movie = try! JSONDecoder().decode(PlexMetadata.self, from: Data(#"{"ratingKey":"1","type":"movie"}"#.utf8))
-        var asked = false
+        let asked = OSAllocatedUnfairLock(initialState: false)
         let markers = await PlexPlaybackMarkers.community(
             for: movie, serverURL: "http://s", token: "t", network: StubNetwork()
-        ) { _, _, _ in asked = true; return [] }
-        XCTAssertFalse(asked)
+        ) { _, _, _, _ in asked.withLock { $0 = true }; return [] }
+        XCTAssertFalse(asked.withLock { $0 })
         XCTAssertTrue(markers.isEmpty)
     }
 }

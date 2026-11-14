@@ -5482,28 +5482,7 @@
         }
       }
     },
-    "Fills in intro and credits markers that Plex is missing, from introdb.app. Only the show’s IMDb ID and episode number are sent." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ergänzt Intro- und Abspannmarker, die in Plex fehlen, über introdb.app. Gesendet werden nur die IMDb-ID der Serie und die Folgennummer."
-          }
-        },
-        "el" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Συμπληρώνει δείκτες εισαγωγής και τίτλων τέλους που λείπουν από το Plex μέσω introdb.app. Αποστέλλονται μόνο το IMDb ID της σειράς και ο αριθμός επεισοδίου."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Complète les repères d’intro et de générique manquants dans Plex, depuis introdb.app. Seuls l’identifiant IMDb de la série et le numéro d’épisode sont envoyés."
-          }
-        }
-      }
-    },
+    "Fills in intro, recap and credits markers your server is missing, from introdb.app and TheIntroDB.org. Only the show’s IMDb, TMDB or TVDB ID and the episode number are sent." : {},
     "Filter" : {
       "localizations" : {
         "de" : {

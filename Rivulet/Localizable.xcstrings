@@ -8804,22 +8804,7 @@
         }
       }
     },
-    "Fills in missing intro, recap and credits markers from introdb.app." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ergänzt fehlende Intro-, Rückblick- und Abspannmarker über introdb.app."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Complète les marqueurs d’intro, de récap et de générique manquants depuis introdb.app."
-          }
-        }
-      }
-    },
+    "Fills in missing intro, recap and credits markers from introdb.app and TheIntroDB.org." : {},
     "Filter List URL" : {
       "localizations" : {
         "de" : {

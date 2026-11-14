@@ -197,7 +197,7 @@ enum SettingsDescriptorStore {
         ),
         "useIntroDB": SettingDescriptor(
             icon: "magnifyingglass",
-            description: "Fills in missing intro, recap and credits markers from introdb.app."
+            description: "Fills in missing intro, recap and credits markers from introdb.app and TheIntroDB.org."
         ),
         "promptResumeOrRestart": SettingDescriptor(
             icon: "questionmark.circle",

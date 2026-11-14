@@ -55,7 +55,7 @@ extension ProviderPlayback {
             }
         }
         let extras = awaitingExtras
-            ? await provider.playbackExtras(for: item.ref, sourceID: stream.source.id) : PlaybackExtras()
+            ? await CommunityMarkers.extras(from: provider, item: item, sourceID: stream.source.id) : PlaybackExtras()
         var prepared = ProviderPlayback(provider: provider, item: item, detail: detail, stream: stream, extras: extras,
                                         quality: settled)
         prepared.extrasPending = !awaitingExtras

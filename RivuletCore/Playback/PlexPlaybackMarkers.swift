@@ -5,8 +5,8 @@
 //  PlexPlaybackMarkers.swift
 //  Rivulet
 //
-//  Skip markers for a Plex item: the server's own, plus IntroDB's community
-//  ones for kinds Plex has none of. The lookup is opt-in ("useIntroDB").
+//  Skip markers for a Plex item: the server's own, plus the community
+//  databases' for kinds Plex has none of (`CommunityMarkers`, opt-in).
 //
 
 import Foundation
@@ -42,18 +42,21 @@ enum PlexPlaybackMarkers {
         }
     }
 
-    /// IntroDB's markers for an episode, keyed on its show's IMDb id (an episode's own guids are
-    /// episode-level ids IntroDB rejects). Empty for anything else, or when no id is found.
+    /// The community databases' markers for an episode, keyed on its show's ids (an episode's own
+    /// guids are episode-level ids the databases reject). Empty for anything else, or with no id.
     static func community(
         for item: PlexMetadata, serverURL: String, token: String, network: PlexNetworkManager,
-        lookup: @Sendable (String, Int, Int) async -> [PlexMarker] = { await IntroDBClient().markers(imdbID: $0, season: $1, episode: $2) }
+        lookup: CommunityMarkers.Lookup = CommunityMarkers.live
     ) async -> [PlexMarker] {
         guard item.type == "episode", let showKey = item.grandparentRatingKey,
               let season = item.parentIndex, let episode = item.index else { return [] }
         let show = try? await network.getMetadata(serverURL: serverURL, authToken: token, ratingKey: showKey, includeGuids: true)
         let guids = (show?.Guid ?? []).compactMap(\.id) + [show?.guid].compactMap { $0 }
-        guard let imdbID = guids.compactMap(PlexMetadata.extractImdbId(from:)).first else { return [] }
-        return await lookup(imdbID, season, episode)
+        let ids = CommunityShowIDs(imdb: guids.lazy.compactMap(PlexMetadata.extractImdbId(from:)).first,
+                                   tmdb: guids.lazy.compactMap(PlexMetadata.extractTmdbId(from:)).first,
+                                   tvdb: guids.lazy.compactMap(PlexMetadata.extractTvdbId(from:)).first)
+        guard !ids.isEmpty else { return [] }
+        return await lookup(ids, season, episode, item.duration.map { TimeInterval($0) / 1000 })
     }
 
     /// Plex's markers for `item`, with IntroDB's when the user opted in.
@@ -61,8 +64,12 @@ enum PlexPlaybackMarkers {
         for item: PlexMetadata, serverURL: String, token: String, network: PlexNetworkManager
     ) async -> [PlexMarker] {
         let plex = item.Marker ?? []
-        guard UserDefaults.standard.bool(forKey: "useIntroDB") else { return merged(plex: plex, community: []) }
-        let community = await community(for: item, serverURL: serverURL, token: token, network: network)
+        let kinds = Set(plex.compactMap(\.type))
+        guard CommunityMarkers.isEnabled, !Set(CommunityMarkers.kinds).isSubset(of: kinds) else {
+            return merged(plex: plex, community: [])
+        }
+        let fetch = Task { await community(for: item, serverURL: serverURL, token: token, network: network) }
+        let community = await CommunityMarkers.value(of: fetch, within: CommunityMarkers.budget) ?? []
         return merged(plex: plex, community: community)
     }
 }

@@ -883,7 +883,8 @@ final class UniversalPlayerViewModel: ObservableObject {
     private func loadProviderMarkers(_ playback: ProviderPlayback) {
         let ref = playback.item.ref
         Task { [weak self] in
-            let extras = await playback.provider.playbackExtras(for: ref, sourceID: playback.stream.source.id)
+            let extras = await CommunityMarkers.extras(from: playback.provider, item: playback.item,
+                                                       sourceID: playback.stream.source.id)
             // The source still being this item is the staleness check: an autoplay swap moves it.
             guard let self, case .provider(var current) = self.source, current.item.ref == ref else { return }
             current.extras = extras
@@ -1952,7 +1953,7 @@ final class UniversalPlayerViewModel: ObservableObject {
         // Plex stays authoritative — the backfill only adds kinds Plex didn't
         // provide. Detached so a slow/dead community DB can't delay start.
         // A provider item's markers come from its provider (in the shim).
-        if case .plex = source, UserDefaults.standard.bool(forKey: "useIntroDB") {
+        if case .plex = source, CommunityMarkers.isEnabled {
             Task { [weak self] in
                 await self?.backfillMarkersFromIntroDB()
             }
@@ -5612,47 +5613,25 @@ final class UniversalPlayerViewModel: ObservableObject {
         }
     }
 
-    /// Adds IntroDB backup markers for kinds Plex didn't provide. Episodes
-    /// only (the lookup keys on the show's IMDB id + season/episode). Plex is
-    /// authoritative: a kind Plex already emitted is never replaced. Gated by
-    /// the "useIntroDB" opt-in at the call site.
+    /// Adds the community databases' markers for kinds Plex didn't provide. Episodes only (the
+    /// lookup keys on the show's ids + season/episode). Plex is authoritative: a kind Plex already
+    /// emitted is never replaced. Gated by the "useIntroDB" opt-in at the call site.
     private func backfillMarkersFromIntroDB() async {
-        guard metadata.type == "episode",
-              let season = metadata.parentIndex,
-              let episode = metadata.index else { return }
-
         let presentKinds = Set((metadata.Marker ?? []).compactMap(\.type))
-        let missingKinds = ["intro", "recap", "credits"].filter { !presentKinds.contains($0) }
-        guard !missingKinds.isEmpty else { return }
-
-        guard let imdbID = await showIMDBID() else { return }
+        let missingKinds = CommunityMarkers.kinds.filter { !presentKinds.contains($0) }
+        guard metadata.type == "episode", !missingKinds.isEmpty else { return }
 
         let generation = itemGeneration
-        let backup = await IntroDBClient().markers(imdbID: imdbID, season: season, episode: episode)
+        let backup = await PlexPlaybackMarkers.community(
+            for: metadata, serverURL: serverURL, token: authToken, network: PlexNetworkManager.shared)
         guard generation == itemGeneration else { return }  // item swapped mid-fetch
 
         let extras = backup.filter { marker in
             guard let type = marker.type else { return false }
-            return missingKinds.contains(type)
+            return !presentKinds.contains(type)
         }
         guard !extras.isEmpty else { return }
         metadata.Marker = (metadata.Marker ?? []) + extras
-    }
-
-    /// The show's IMDB id (e.g. "tt0903747"), resolved from the show-level
-    /// metadata's external guids.
-    private func showIMDBID() async -> String? {
-        guard let showKey = metadata.grandparentRatingKey else { return nil }
-        guard let show = try? await PlexNetworkManager.shared.getMetadata(
-            serverURL: serverURL,
-            authToken: authToken,
-            ratingKey: showKey,
-            includeGuids: true
-        ) else { return nil }
-        return show.Guid?
-            .compactMap(\.id)
-            .first { $0.hasPrefix("imdb://") }?
-            .replacingOccurrences(of: "imdb://", with: "")
     }
 
     // MARK: - Post-Video Handling
