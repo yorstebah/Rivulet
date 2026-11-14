@@ -691,6 +691,8 @@ final class PlexHomeViewController: UIViewController {
     /// session. Unwatched also persists per profile (`LibrarySettingsManager.unwatchedOnly`).
     private var libraryFilter = LibraryFilter.none
     private var filterOptions = LibraryFilterOptions()
+    /// The server's languages and the one shown (Xtream); nil where the server has none.
+    private var languageChoices: LibraryLanguageChoices?
     private static var sessionFilters: [String: LibraryFilter] = [:]
     private let alphabetBar = LibraryAlphabetBarView()
     private let letterIndicator = LibraryLetterIndicatorView()
@@ -1997,7 +1999,29 @@ final class PlexHomeViewController: UIViewController {
     /// The View menu's filter group, nil where the library has none.
     private func filterMenu() -> UIMenu? {
         guard offersFilters else { return nil }
-        return LibraryFilterMenu.menu(libraryFilter, options: filterOptions) { [weak self] in self?.applyFilter($0) }
+        return LibraryFilterMenu.menu(libraryFilter, options: filterOptions, languages: languageChoices,
+                                      selectLanguage: { [weak self] in self?.applyLanguage($0) }) { [weak self] in
+            self?.applyFilter($0)
+        }
+    }
+
+    /// Narrows the server to one language, or back to all of the viewer's: Home and every other
+    /// listing follow. This grid reloads as for a filter change.
+    private func applyLanguage(_ language: String?) {
+        guard let library = providerLibrary, languageChoices?.selected != language,
+              let provider = MediaProviderRegistry.shared.provider(for: library.providerID) else { return }
+        languageChoices?.selected = language
+        Task { @MainActor [weak self] in
+            await provider.setLanguage(language)
+            guard let self else { return }
+            self.resetGrid()
+            self.pageZero = .loading
+            self.applySnapshot(animated: false)
+            self.refreshSortHeaderCount()
+            self.loadGridPage(containing: 0)
+            self.loadAlphabetIndex()
+            self.updateHomeState()
+        }
     }
 
     /// Reloads page 1 under the new filter, the way a sort change does; the header cell is
@@ -2028,6 +2052,10 @@ final class PlexHomeViewController: UIViewController {
             fetch = { try await PlexNetworkManager.shared.getLibraryFilterOptions(serverURL: serverURL, authToken: token, sectionId: key) }
         }
         Task { @MainActor [weak self] in
+            if let library = self?.providerLibrary,
+               let provider = MediaProviderRegistry.shared.provider(for: library.providerID) {
+                self?.languageChoices = await provider.languageChoices(in: library)
+            }
             guard let options = try? await fetch(), let self else { return }
             self.filterOptions = options
             self.refreshSortHeaderCount()
@@ -3453,7 +3481,7 @@ final class PlexHomeViewController: UIViewController {
                 sortMenu: sortMenu(),
                 view: gridShowsCollections ? .collections : .titles,
                 viewMenu: viewMenu,
-                filterSummary: offersFilters ? LibraryFilterMenu.summary(libraryFilter) : nil,
+                filterSummary: offersFilters ? LibraryFilterMenu.summary(libraryFilter, language: languageChoices?.selectedName) : nil,
                 onShuffle: shuffleLibrary.map { library in { [weak self] in
                     guard let self else { return }
                     ShufflePlayback.shuffle(library, from: self)

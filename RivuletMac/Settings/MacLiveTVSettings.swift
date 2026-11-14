@@ -216,13 +216,16 @@ private struct MacXtreamLanguagesView: View {
                 }
             }
             Section {
-                ForEach(order, id: \.self) { origin in
-                    row(title: ContentOrigin.title(forOrigin: origin),
-                        count: available.first { $0.origin == origin }?.count,
-                        selected: languages.origins.contains(origin)) {
+                ForEach(order, id: \.self) { language in
+                    row(title: XtreamVODLanguages.name(ofLanguage: language),
+                        count: counts.first { $0.language == language }?.count,
+                        selected: languages.languages.contains(language)) {
                         var next = languages
-                        if let index = next.origins.firstIndex(of: origin) { next.origins.remove(at: index) } else {
-                            next.origins.append(origin)
+                        let origins = XtreamVODLanguages.origins(ofLanguage: language, available: available.map(\.origin))
+                        if next.languages.contains(language) {
+                            next.origins.removeAll(where: Set(origins).contains)
+                        } else {
+                            next.origins += origins.filter { !next.origins.contains($0) }
                         }
                         update(next)
                     }
@@ -248,8 +251,13 @@ private struct MacXtreamLanguagesView: View {
         }
     }
 
+    private var counts: [(language: String, count: Int)] { XtreamVODLanguages.languageCounts(available) }
+
+    /// The chosen languages in order of preference, then the rest by how many titles they hold.
     private var order: [String] {
-        languages.origins + available.map(\.origin).filter { !languages.origins.contains($0) }
+        let carried = Set(counts.map(\.language))
+        return languages.languages.filter { carried.contains($0) || available.isEmpty }
+            + counts.map(\.language).filter { !languages.languages.contains($0) }
     }
 
     private func update(_ next: XtreamVODLanguages) {

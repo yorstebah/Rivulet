@@ -309,7 +309,20 @@ private struct IOSPlexLibraryBrowseView: View {
     }
 
     private var sort: LibrarySortOption { LibrarySortOption(rawValue: sortRaw) ?? .titleAsc }
-    private var queryKey: String { "\(sortRaw)|\(filter)" }
+    private var queryKey: String { "\(sortRaw)|\(filter)|\(languageShown)" }
+    /// The server's languages (Xtream) and the one every listing is narrowed to; "" is all of
+    /// the viewer's. Set once the server has switched, so the grid reloads in the new language.
+    @State private var languageChoices: LibraryLanguageChoices?
+    @State private var languageShown = ""
+    private var languageSelection: Binding<String> {
+        Binding(get: { languageShown }, set: { id in
+            guard let provider = browse.provider(for: library.providerID) else { return }
+            Task {
+                await provider.setLanguage(id.isEmpty ? nil : id)
+                languageShown = id
+            }
+        })
+    }
     private var unwatchedOnly: Bool { filter.unwatchedOnly }
     /// Genre and Decade apply to movie and TV libraries only.
     private var offersGenreAndDecade: Bool { library.kind == .movies || library.kind == .shows }
@@ -369,6 +382,13 @@ private struct IOSPlexLibraryBrowseView: View {
                         Text("All").tag(false)
                         Text("Unwatched").tag(true)
                     }
+                    if let languageChoices {
+                        // The server's language: Home and every listing follow, not only this grid.
+                        Picker("Language", selection: languageSelection) {
+                            Text("My Languages").tag("")
+                            ForEach(languageChoices.languages, id: \.id) { Text(verbatim: $0.name).tag($0.id) }
+                        }
+                    }
                     if offersGenreAndDecade {
                         if !filterOptions.genres.isEmpty {
                             Picker("Genre", selection: genreSelection) {
@@ -386,7 +406,7 @@ private struct IOSPlexLibraryBrowseView: View {
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease")
                 }
-                .tint(filter.isActive ? .accentColor : nil)
+                .tint(filter.isActive || !languageShown.isEmpty ? .accentColor : nil)
             }
         }
         .onChange(of: filter.unwatchedOnly) { _, on in
@@ -394,6 +414,8 @@ private struct IOSPlexLibraryBrowseView: View {
         }
         .task(id: library.id) {
             guard offersGenreAndDecade, let provider = browse.provider(for: library.providerID) else { return }
+            languageChoices = await provider.languageChoices(in: library)
+            languageShown = languageChoices?.selected ?? ""
             filterOptions = (try? await provider.filterOptions(in: library)) ?? LibraryFilterOptions()
         }
         .task(id: "\(queryKey)|\(browse.watchStateRevision)") {

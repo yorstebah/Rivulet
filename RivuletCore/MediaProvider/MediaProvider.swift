@@ -35,6 +35,10 @@ protocol MediaProvider: Sendable, Identifiable {
     func items(in library: MediaLibrary, sort: SortOption, filter: LibraryFilter, page: Page) async throws -> PagedResult<MediaItem>
     /// The genres and decades a filtered listing of this library can use. Default: none.
     func filterOptions(in library: MediaLibrary) async throws -> LibraryFilterOptions
+    /// The languages this server's titles can be narrowed to, server-wide. Default: none.
+    func languageChoices(in library: MediaLibrary) async -> LibraryLanguageChoices?
+    /// Narrows every listing of this server to one language, or with nil shows them all again.
+    func setLanguage(_ language: String?) async
     func children(of itemRef: MediaItemRef) async throws -> [MediaItem]
     /// At most `limit` playable titles of a video library (movies, videos, a TV library's episodes) in
     /// an order the server randomizes. Default: a refusal.
@@ -307,6 +311,8 @@ extension MediaProvider {
         throw MediaProviderError.backendSpecific(underlying: "library filter not supported")
     }
     func filterOptions(in library: MediaLibrary) async throws -> LibraryFilterOptions { LibraryFilterOptions() }
+    func languageChoices(in library: MediaLibrary) async -> LibraryLanguageChoices? { nil }
+    func setLanguage(_ language: String?) async {}
     func items(in library: MediaLibrary, sort: SortOption, unwatchedOnly: Bool, page: Page) async throws -> PagedResult<MediaItem> {
         try await items(in: library, sort: sort, filter: LibraryFilter(unwatchedOnly: unwatchedOnly), page: page)
     }

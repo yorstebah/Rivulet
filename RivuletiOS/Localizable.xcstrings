@@ -19,6 +19,7 @@
     "For You picks channels from what you watch. With iCloud sync on, it learns across your devices." : {},
     "International" : {},
     "Its channels stay where they are." : {},
+    "Language" : {},
     "Languages" : {},
     "List" : {},
     "List Name" : {},
@@ -39,8 +40,10 @@
       }
     },
     "Movies and TV Shows" : {},
+    "Multi" : {},
     "Multi first, then your device's languages, then English." : {},
     "Multilingual" : {},
+    "My Languages" : {},
     "Name Contains" : {},
     "Name Contains “%@”" : {},
     "New List" : {},

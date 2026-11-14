@@ -67,8 +67,8 @@ enum LibraryViewMode: String {
 /// The View menu's filter group: Genre and Decade submenus (All first) and an Unwatched Only toggle.
 enum LibraryFilterMenu {
     /// The View button's label while a filter is on, e.g. "Action · 1990s · Unwatched"; nil when none is.
-    static func summary(_ filter: LibraryFilter) -> String? {
-        var parts: [String] = []
+    static func summary(_ filter: LibraryFilter, language: String? = nil) -> String? {
+        var parts: [String] = language.map { [$0] } ?? []
         if let genre = filter.genre { parts.append(genre.name) }
         if let decade = filter.decade { parts.append(LibraryFilter.decadeTitle(decade)) }
         if filter.unwatchedOnly { parts.append(String(localized: "Unwatched")) }
@@ -76,8 +76,21 @@ enum LibraryFilterMenu {
     }
 
     static func menu(_ filter: LibraryFilter, options: LibraryFilterOptions,
+                     languages: LibraryLanguageChoices? = nil, selectLanguage: ((String?) -> Void)? = nil,
                      change: @escaping (LibraryFilter) -> Void) -> UIMenu {
         var children: [UIMenuElement] = []
+        // The server's language: every listing follows, Home included, not only this grid.
+        if let languages, let selectLanguage {
+            let mine = UIAction(title: String(localized: "My Languages"), state: languages.selected == nil ? .on : .off) { _ in
+                selectLanguage(nil)
+            }
+            let each = languages.languages.map { language in
+                UIAction(title: language.name, state: languages.selected == language.id ? .on : .off) { _ in
+                    selectLanguage(language.id)
+                }
+            }
+            children.append(UIMenu(title: String(localized: "Language"), children: [mine] + each))
+        }
         if !options.genres.isEmpty {
             let all = UIAction(title: String(localized: "All"), state: filter.genre == nil ? .on : .off) { _ in
                 var next = filter; next.genre = nil; change(next)

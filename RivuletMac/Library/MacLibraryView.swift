@@ -145,7 +145,20 @@ private struct MacLibraryBrowseView: View {
     }
 
     private var sort: LibrarySortOption { LibrarySortOption(rawValue: sortRaw) ?? .titleAsc }
-    private var queryKey: String { "\(sortRaw)|\(filter)" }
+    private var queryKey: String { "\(sortRaw)|\(filter)|\(languageShown)" }
+    /// The server's languages (Xtream) and the one every listing is narrowed to; "" is all of
+    /// the viewer's. Set once the server has switched, so the grid reloads in the new language.
+    @State private var languageChoices: LibraryLanguageChoices?
+    @State private var languageShown = ""
+    private var languageSelection: Binding<String> {
+        Binding(get: { languageShown }, set: { id in
+            guard let provider = browse.provider(for: library.providerID) else { return }
+            Task {
+                await provider.setLanguage(id.isEmpty ? nil : id)
+                languageShown = id
+            }
+        })
+    }
     private var unwatchedOnly: Bool { filter.unwatchedOnly }
     /// Genre and Decade apply to movie and TV libraries only.
     private var offersGenreAndDecade: Bool { library.kind == .movies || library.kind == .shows }
@@ -200,6 +213,13 @@ private struct MacLibraryBrowseView: View {
                         Text("Unwatched").tag(true)
                     }
                     .pickerStyle(.inline)
+                    if let languageChoices {
+                        // The server's language: Home and every listing follow, not only this grid.
+                        Picker("Language", selection: languageSelection) {
+                            Text("My Languages").tag("")
+                            ForEach(languageChoices.languages, id: \.id) { Text(verbatim: $0.name).tag($0.id) }
+                        }
+                    }
                     if offersGenreAndDecade {
                         if !filterOptions.genres.isEmpty {
                             Picker("Genre", selection: genreSelection) {
@@ -215,7 +235,7 @@ private struct MacLibraryBrowseView: View {
                         }
                     }
                 } label: {
-                    Label("Filter", systemImage: filter.isActive ? "line.3.horizontal.decrease.circle.fill"
+                    Label("Filter", systemImage: filter.isActive || !languageShown.isEmpty ? "line.3.horizontal.decrease.circle.fill"
                                                                  : "line.3.horizontal.decrease")
                 }
             }
@@ -226,6 +246,8 @@ private struct MacLibraryBrowseView: View {
         }
         .task(id: library.id) {
             guard offersGenreAndDecade, let provider = browse.provider(for: library.providerID) else { return }
+            languageChoices = await provider.languageChoices(in: library)
+            languageShown = languageChoices?.selected ?? ""
             filterOptions = (try? await provider.filterOptions(in: library)) ?? LibraryFilterOptions()
         }
         .task(id: "\(queryKey)|\(browse.watchStateRevision)") {

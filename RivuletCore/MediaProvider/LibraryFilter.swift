@@ -52,3 +52,20 @@ struct LibraryFilterOptions: Equatable, Sendable {
         Array(Set(years.filter { $0 > 0 }.map { $0 / 10 * 10 })).sorted(by: >)
     }
 }
+
+/// A language a server's titles can be narrowed to from its libraries, server-wide: Home,
+/// libraries, collections and search all follow (Xtream, whose panels list a title per language).
+struct LibraryLanguage: Hashable, Sendable {
+    /// The provider's own key ("multi", "nl", "en").
+    let id: String
+    let name: String
+}
+
+struct LibraryLanguageChoices: Equatable, Sendable {
+    /// The languages to pick from, the viewer's preferred first.
+    var languages: [LibraryLanguage]
+    /// The one shown now; nil shows all of the viewer's languages.
+    var selected: String?
+
+    var selectedName: String? { selected.flatMap { id in languages.first { $0.id == id }?.name } }
+}

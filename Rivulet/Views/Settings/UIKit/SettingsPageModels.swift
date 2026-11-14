@@ -771,15 +771,18 @@ enum SettingsContent {
     /// asks before removing it (the Pinned Collections pattern). A removed row
     /// goes at once, so a move never passes a channel that is no longer a
     /// favourite.
-    /// A source's film and series languages: All Languages, then each language its titles carry,
-    /// the chosen ones first in order of preference. Select adds a language at the end or takes it
-    /// out; the first chosen is the copy shown when a title has several.
+    /// A source's film and series languages: All Languages, then each language its titles carry
+    /// (Dutch is the Netherlands and Belgium, English every English-speaking country), the chosen
+    /// ones first in order of preference. Select adds a language at the end or takes it out; the
+    /// first chosen is the copy shown when a title has several.
     private static var xtreamLanguages: [SettingsRowItem] {
         guard let source = pendingSourceDetail else { return [] }
         let current = XtreamVODSources.languages(for: source.id)
         let available = XtreamVODSources.availableOrigins[source.id] ?? []
-        let counts = Dictionary(available.map { ($0.origin, $0.count) }, uniquingKeysWith: { first, _ in first })
-        let order = current.origins + available.map(\.origin).filter { !current.origins.contains($0) }
+        let counts = Dictionary(XtreamVODLanguages.languageCounts(available).map { ($0.language, $0.count) },
+                                uniquingKeysWith: { first, _ in first })
+        let order = current.languages.filter { counts[$0] != nil || available.isEmpty }
+            + XtreamVODLanguages.languageCounts(available).map(\.language).filter { !current.languages.contains($0) }
         var rows = [SettingsRowItem(id: "lang_all", title: "All Languages", kind: .selectable(
             isSelected: { XtreamVODSources.languages(for: source.id).showsEverything },
             value: { nil },
@@ -790,16 +793,18 @@ enum SettingsContent {
         if available.isEmpty {
             rows.append(SettingsRowItem(id: "lang_loading", title: "Loading Languages…", kind: .info(value: { "" })))
         }
-        for origin in order {
-            rows.append(SettingsRowItem(id: "lang_\(origin)", verbatim: ContentOrigin.title(forOrigin: origin), kind: .selectable(
-                isSelected: { XtreamVODSources.languages(for: source.id).origins.contains(origin) },
-                value: { counts[origin].map { $0.formatted() } },
+        for language in order {
+            rows.append(SettingsRowItem(id: "lang_\(language)", verbatim: XtreamVODLanguages.name(ofLanguage: language), kind: .selectable(
+                isSelected: { XtreamVODSources.languages(for: source.id).languages.contains(language) },
+                value: { counts[language].map { $0.formatted() } },
                 handler: { vc in
                     var languages = XtreamVODSources.languages(for: source.id)
-                    if let index = languages.origins.firstIndex(of: origin) {
-                        languages.origins.remove(at: index)
+                    let covered = Set(XtreamVODLanguages.origins(ofLanguage: language, available: available.map(\.origin)))
+                    if languages.languages.contains(language) {
+                        languages.origins.removeAll(where: covered.contains)
                     } else {
-                        languages.origins.append(origin)
+                        languages.origins += XtreamVODLanguages.origins(ofLanguage: language, available: available.map(\.origin))
+                            .filter { !languages.origins.contains($0) }
                     }
                     XtreamVODSources.setLanguages(languages, for: source.id)
                     (vc as? SettingsPageViewController)?.reloadRows()

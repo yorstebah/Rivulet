@@ -31,6 +31,63 @@ nonisolated struct XtreamVODLanguages: Sendable, Hashable, Codable {
         "tr": ["TR"], "pl": ["PL"], "ar": ["AR"], "hi": ["IN"], "ja": ["JP"], "ko": ["KR"],
     ]
 
+    /// Which language a country's copies are read as, where a country has several: Belgium is
+    /// Dutch, Canada and Switzerland their first language above.
+    private static let languageOfRegion: [String: String] = {
+        var map: [String: String] = [:]
+        for language in ["nl", "en", "de", "fr", "es", "pt", "it", "sv", "da", "nb", "fi", "el", "tr", "pl", "ar", "hi", "ja", "ko"] {
+            for region in regionsByLanguage[language] ?? [] where map[region] == nil { map[region] = language }
+        }
+        return map
+    }()
+
+    // MARK: - Languages as the viewer picks them
+
+    /// The language an origin belongs to, as Settings and the filter show it: "multi", "nl", "en",
+    /// or the origin itself where it names no language of its own (a region group, "EXYU").
+    static func language(of origin: String) -> String {
+        if origin == "MULTI" { return "multi" }
+        return languageOfRegion[origin] ?? origin
+    }
+
+    /// A language's name: "Multi", "Dutch", "English", else the origin's own name.
+    static func name(ofLanguage language: String) -> String {
+        if language == "multi" { return String(localized: "Multi") }
+        if language.count == 2, language == language.lowercased(),
+           let name = Locale.current.localizedString(forLanguageCode: language) {
+            return name.prefix(1).uppercased() + name.dropFirst()
+        }
+        let title = ContentOrigin.title(forOrigin: language), marker = ContentOrigin.marker(forOrigin: language)
+        return title.hasPrefix(marker + " ") ? String(title.dropFirst(marker.count + 1)) : title
+    }
+
+    /// Every origin a language covers: its countries, and those `available` lists for it.
+    static func origins(ofLanguage language: String, available: [String] = []) -> [String] {
+        if language == "multi" { return ["MULTI"] }
+        let known = regionsByLanguage[language] ?? [language]
+        return known + available.filter { self.language(of: $0) == language && !known.contains($0) }
+    }
+
+    /// The languages these origins make, in their order: Multi, Dutch, English…
+    var languages: [String] {
+        var seen = Set<String>()
+        return origins.map(Self.language(of:)).filter { seen.insert($0).inserted }
+    }
+
+    /// Only one language's copies, the preference within it kept ("Show: English").
+    func focused(on language: String, available: [String] = []) -> XtreamVODLanguages {
+        let covered = Set(Self.origins(ofLanguage: language, available: available))
+        let kept = origins.filter(covered.contains)
+        return XtreamVODLanguages(origins: kept.isEmpty ? Self.origins(ofLanguage: language, available: available) : kept)
+    }
+
+    /// The languages these origins carry, with their titles, most first.
+    static func languageCounts(_ available: [(origin: String, count: Int)]) -> [(language: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for entry in available { counts[language(of: entry.origin), default: 0] += entry.count }
+        return counts.map { ($0.key, $0.value) }.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }
+    }
+
     /// MULTI first, then the device's languages in its order, then English for everyone:
     /// a Dutch device reads MULTI, NL, BE, GB, US…
     static func defaults(preferredLanguages: [String] = Locale.preferredLanguages) -> XtreamVODLanguages {
@@ -45,14 +102,11 @@ nonisolated struct XtreamVODLanguages: Sendable, Hashable, Codable {
 
     var showsEverything: Bool { origins.isEmpty }
 
-    /// "Multilingual, Netherlands, Belgium…", or All Languages: a Settings row's value.
+    /// "Multi, Dutch, English", or All Languages: a Settings row's value.
     var summary: String {
         guard !origins.isEmpty else { return String(localized: "All Languages") }
-        let names = origins.prefix(3).map { origin in
-            let title = ContentOrigin.title(forOrigin: origin), marker = ContentOrigin.marker(forOrigin: origin)
-            return title.hasPrefix(marker + " ") ? String(title.dropFirst(marker.count + 1)) : title
-        }
-        return names.joined(separator: ", ") + (origins.count > 3 ? "…" : "")
+        let names = languages.map(Self.name(ofLanguage:))
+        return names.prefix(3).joined(separator: ", ") + (names.count > 3 ? "…" : "")
     }
 
     /// Whether a copy in this origin shows. Untagged copies, and tags that name no place, always do.

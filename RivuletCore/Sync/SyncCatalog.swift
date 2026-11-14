@@ -33,7 +33,7 @@ nonisolated enum SyncCatalog {
         // The viewer's own and smart channel lists, and pinned categories
         channelListsKey, "liveTVPinnedCategories", viewingsKey,
         // Xtream films and series: where the viewer is, and their favorites (the panel keeps neither)
-        watchProgressKey, "xtreamFavorites", "xtreamVODLanguages",
+        watchProgressKey, "xtreamFavorites", "xtreamVODLanguages", "xtreamVODLanguageFocus",
         // Servers the user turned off, by machine id
         "plexDisabledServers",
         // Photos

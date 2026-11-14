@@ -309,6 +309,17 @@ final class XtreamVODProviderTests: XCTestCase {
         } catch {}
     }
 
+    func test_unwatchedFilter_leavesOutFilmsWatchedToTheEnd() async throws {
+        let provider = provider()
+        let movies = try await provider.libraries()[0]
+        try await provider.markPlayed(ref(.movie("10")))
+        try await provider.updateProgress(ref(.movie("12")), position: 600)
+        let page = try await provider.items(in: movies, sort: .titleAsc, filter: LibraryFilter(unwatchedOnly: true),
+                                            page: Page(offset: 0, limit: 10))
+        XCTAssertEqual(page.items.map(\.title), ["1917", "Up"])
+        XCTAssertEqual(page.total, 2)
+    }
+
     func test_search_findsFilmsAndSeries() async throws {
         let found = try await provider().search("the")
         XCTAssertEqual(found.map(\.title), ["The Wire"])

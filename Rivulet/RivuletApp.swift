@@ -142,7 +142,7 @@ struct RivuletApp: App {
                 NotificationCenter.default.post(name: .plexDataNeedsRefresh, object: nil)
             }
             // Film and series languages chosen on another device: Home and the libraries follow.
-            if touched([XtreamVODSources.languagesKey]) { XtreamVODSources.onChanged?() }
+            if touched([XtreamVODSources.languagesKey, XtreamVODSources.languageFocusKey]) { XtreamVODSources.onChanged?() }
         }
         // The Live TV store re-keys old URL-named M3U favorites when it starts. That must finish before the
         // first sync pass, or a playlist URL with its login could be uploaded as a channel id.

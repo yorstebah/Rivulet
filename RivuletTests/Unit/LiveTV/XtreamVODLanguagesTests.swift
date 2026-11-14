@@ -48,9 +48,31 @@ final class XtreamVODLanguagesTests: XCTestCase {
 
     func test_summary_namesTheLanguages() {
         XCTAssertEqual(XtreamVODLanguages.everything.summary, String(localized: "All Languages"))
-        let summary = XtreamVODLanguages(origins: ["MULTI", "NL", "GB", "US"]).summary
-        XCTAssertTrue(summary.hasPrefix(String(localized: "Multilingual") + ", "), summary)
-        XCTAssertTrue(summary.hasSuffix("…"))
+        let summary = XtreamVODLanguages(origins: ["MULTI", "NL", "GB", "US", "FR", "DE"]).summary
+        XCTAssertTrue(summary.hasSuffix("…"), summary)
         XCTAssertFalse(summary.contains("🇳🇱"))
+    }
+
+    func test_countriesReadAsLanguages_andAFocusKeepsOneOfThem() {
+        XCTAssertEqual(XtreamVODLanguages.language(of: "BE"), "nl")
+        XCTAssertEqual(XtreamVODLanguages.language(of: "US"), "en")
+        XCTAssertEqual(XtreamVODLanguages.language(of: "MULTI"), "multi")
+        XCTAssertEqual(XtreamVODLanguages.language(of: "EXYU"), "EXYU")
+        let mine = XtreamVODLanguages.defaults(preferredLanguages: ["nl-NL"])
+        XCTAssertEqual(mine.languages, ["multi", "nl", "en"])
+        // "Show: English": only English copies, the viewer's order within English kept.
+        let english = mine.focused(on: "en")
+        XCTAssertEqual(english.origins, ["GB", "US", "CA", "AU", "IE", "NZ"])
+        let titles: [(name: String, year: Int?, tag: String?)] = [("Ted Lasso", 2020, "MULTI"), ("Ted Lasso", 2020, "USA")]
+        XCTAssertEqual(english.shown(titles), [1])
+        XCTAssertEqual(mine.shown(titles), [0])
+        XCTAssertEqual(XtreamVODLanguages.languageCounts([("NL", 5), ("BE", 2), ("US", 4), ("GB", 1), ("FR", 3)]).map(\.language),
+                       ["nl", "en", "fr"])
+    }
+
+    func test_summary_readsAsLanguages() {
+        let summary = XtreamVODLanguages.defaults(preferredLanguages: ["nl-NL"]).summary
+        XCTAssertEqual(summary.components(separatedBy: ", ").count, 3, summary)
+        XCTAssertTrue(summary.hasPrefix(String(localized: "Multi") + ", "), summary)
     }
 }

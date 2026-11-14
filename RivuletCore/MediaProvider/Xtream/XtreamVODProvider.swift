@@ -119,9 +119,35 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         MediaLibrary(id: library.rawValue, providerID: id, title: library.title, kind: library.kind)
     }
 
+    /// The viewer's languages that this source's titles carry (every language it carries when the
+    /// viewer keeps them all), preferred first, and the one the libraries are narrowed to.
+    func languageChoices(in library: MediaLibrary) async -> LibraryLanguageChoices? {
+        if await MainActor.run(body: { XtreamVODSources.availableOrigins[id] == nil }) {
+            let origins = await catalog.availableOrigins()
+            await MainActor.run { XtreamVODSources.availableOrigins[id] = origins }
+        }
+        return await MainActor.run {
+            let available = XtreamVODSources.availableOrigins[id] ?? []
+            let carried = Set(available.map { XtreamVODLanguages.language(of: $0.origin) })
+            let preferred = XtreamVODSources.languages(for: id)
+            let ids = preferred.showsEverything
+                ? XtreamVODLanguages.languageCounts(available).map(\.language)
+                : preferred.languages.filter(carried.contains)
+            guard ids.count > 1 else { return nil }
+            return LibraryLanguageChoices(
+                languages: ids.map { LibraryLanguage(id: $0, name: XtreamVODLanguages.name(ofLanguage: $0)) },
+                selected: XtreamVODSources.languageFocus(for: id))
+        }
+    }
+
+    func setLanguage(_ language: String?) async {
+        await MainActor.run { XtreamVODSources.setLanguageFocus(language, for: id) }
+        await applyLanguages()
+    }
+
     /// Brings the catalogue to the viewer's languages for this source; nothing when unchanged.
     private func applyLanguages() async {
-        let languages = await MainActor.run { XtreamVODSources.languages(for: id) }
+        let languages = await MainActor.run { XtreamVODSources.shownLanguages(for: id) }
         await catalog.setLanguages(languages)
     }
 
@@ -136,6 +162,36 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         case .series:
             let page = try await catalog.seriesPage(sort: sort, page: page)
             result = (page.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
+        case nil:
+            throw MediaProviderError.notFound
+        }
+        let end = page.offset + result.items.count
+        return PagedResult(items: result.items, total: result.total,
+                           nextPage: end < result.total ? Page(offset: end, limit: page.limit) : nil)
+    }
+
+    /// Unwatched: films not watched to the end (one begun still counts), and series with no
+    /// episode watched to the end. Genre and decade are not offered (`filterOptions` has none).
+    func items(in library: MediaLibrary, sort: SortOption, filter: LibraryFilter, page: Page) async throws -> PagedResult<MediaItem> {
+        guard filter.unwatchedOnly else { return try await items(in: library, sort: sort, page: page) }
+        await applyLanguages()
+        let state = await state()
+        var watched = Set<String>()
+        for (key, record) in state.records where record.watched {
+            switch XtreamVODMapping.id(fromKey: key, source: id) {
+            case .movie(let movieID): watched.insert(movieID)
+            case .episode(let seriesID, _): watched.insert(seriesID)
+            default: break
+            }
+        }
+        let result: (items: [MediaItem], total: Int)
+        switch XtreamVODLibrary(rawValue: library.id) {
+        case .movies:
+            let found = try await catalog.moviePage(sort: sort, page: page, excluding: watched)
+            result = (found.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, found.total)
+        case .series:
+            let found = try await catalog.seriesPage(sort: sort, page: page, excluding: watched)
+            result = (found.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, found.total)
         case nil:
             throw MediaProviderError.notFound
         }
@@ -458,7 +514,7 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     func forYouHub(in library: MediaLibrary, now: Date = Date()) async -> MediaHub? {
         guard let kind = XtreamVODLibrary(rawValue: library.id) else { return nil }
         await applyLanguages()
-        let languages = await MainActor.run { XtreamVODSources.languages(for: id) }
+        let languages = await MainActor.run { XtreamVODSources.shownLanguages(for: id) }
         let state = await state()
         let seeds = XtreamForYou.seeds(state, source: id, library: kind, now: now)
         guard !seeds.isEmpty else { return nil }

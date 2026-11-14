@@ -177,6 +177,21 @@ actor XtreamVODCatalog {
         return (Self.slice(order, page).map { lists.titles[$0] }, order.count)
     }
 
+    /// One page in `sort` order without the titles whose ids are in `excluding` (Unwatched).
+    func moviePage(sort: SortOption, page: Page, excluding: Set<String>) async throws -> (items: [XtreamMovie], total: Int) {
+        let lists = try await shownMovieLists()
+        let order = self.order(.movies, lists.fetchedAt, sort) { lists.titles.map(XtreamVODMapping.sortable) }
+            .filter { !excluding.contains(lists.titles[$0].id) }
+        return (Self.slice(order, page).map { lists.titles[$0] }, order.count)
+    }
+
+    func seriesPage(sort: SortOption, page: Page, excluding: Set<String>) async throws -> (items: [XtreamSeries], total: Int) {
+        let lists = try await shownSeriesLists()
+        let order = self.order(.series, lists.fetchedAt, sort) { lists.titles.map(XtreamVODMapping.sortable) }
+            .filter { !excluding.contains(lists.titles[$0].id) }
+        return (Self.slice(order, page).map { lists.titles[$0] }, order.count)
+    }
+
     func searchMovies(_ query: String, limit: Int) async throws -> [XtreamMovie] {
         let lists = try await shownMovieLists()
         let names = searchNames(.movies, lists.fetchedAt) { lists.titles.map(\.name) }

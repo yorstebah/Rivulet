@@ -47,7 +47,35 @@ enum XtreamVODSources {
         saved[sourceID] = languages.origins
         defaults.set(saved, forKey: languagesKey)
         onChanged?()
+        NotificationCenter.default.post(name: languagesChanged, object: nil)
     }
+
+    /// One language the viewer narrowed a source to from its libraries ("Show: English"), by
+    /// source id: Home, libraries, collections, search and For You follow until it is cleared.
+    /// Synced, as the languages are.
+    static let languageFocusKey = "xtreamVODLanguageFocus"
+
+    static func languageFocus(for sourceID: String, defaults: UserDefaults = .standard) -> String? {
+        (defaults.dictionary(forKey: languageFocusKey) as? [String: String])?[sourceID]
+    }
+
+    static func setLanguageFocus(_ language: String?, for sourceID: String, defaults: UserDefaults = .standard) {
+        var saved = defaults.dictionary(forKey: languageFocusKey) as? [String: String] ?? [:]
+        saved[sourceID] = language
+        defaults.set(saved, forKey: languageFocusKey)
+        onChanged?()
+        NotificationCenter.default.post(name: languagesChanged, object: nil)
+    }
+
+    /// What a source shows: its languages, narrowed to the focused one when there is one.
+    static func shownLanguages(for sourceID: String) -> XtreamVODLanguages {
+        let languages = self.languages(for: sourceID)
+        guard let focus = languageFocus(for: sourceID) else { return languages }
+        return languages.focused(on: focus, available: availableOrigins[sourceID]?.map(\.origin) ?? [])
+    }
+
+    /// Posted when a source's languages or focus change, for screens that list its titles.
+    static let languagesChanged = Notification.Name("XtreamVODSources.languagesChanged")
 
     /// The languages a source's titles carry, most common first, once its lists have loaded:
     /// what Settings offers. In memory only.
