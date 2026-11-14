@@ -39,6 +39,14 @@ nonisolated struct TMDBTitle: Codable, Sendable, Equatable {
     let directors: [String]
 }
 
+/// A title TMDB recommends after another, as much as matching it to a panel needs.
+nonisolated struct TMDBRecommendation: Sendable, Hashable {
+    let id: Int
+    let title: String
+    let originalTitle: String?
+    let year: Int?
+}
+
 actor TMDBLookup {
     enum Kind: String, Sendable { case movie, tv }
 
@@ -51,6 +59,7 @@ actor TMDBLookup {
     private let session: URLSession
     private let language: String
     private var cache: [String: TMDBTitle?] = [:]
+    private var recommendationCache: [String: [TMDBRecommendation]] = [:]
 
     init(apiKey: @escaping @Sendable () async -> String?, session: URLSession = .shared,
          language: String = Locale.preferredLanguages.first ?? "en-US") {
@@ -70,6 +79,37 @@ actor TMDBLookup {
         if let id { found = await details(kind, id: id, key: key) } else { found = nil }
         cache[cacheKey] = found
         return found
+    }
+
+    /// Whether a key is set: without one nothing is asked.
+    func hasKey() async -> Bool {
+        guard let key = await apiKey() else { return false }
+        return !key.isEmpty
+    }
+
+    /// What TMDB recommends after a title ("people who liked this also liked"), best first,
+    /// kept for the session. Empty without a key or an answer.
+    func recommendations(_ kind: Kind, tmdbID: Int) async -> [TMDBRecommendation] {
+        guard let key = await apiKey(), !key.isEmpty else { return [] }
+        let cacheKey = "\(kind.rawValue)|\(tmdbID)"
+        if let known = recommendationCache[cacheKey] { return known }
+        let query = [URLQueryItem(name: "language", value: language), URLQueryItem(name: "page", value: "1")]
+        guard let json = await get("\(kind.rawValue)/\(tmdbID)/recommendations", query, key: key) as? [String: Any],
+              let results = json["results"] as? [[String: Any]] else { return [] }
+        let found = Self.recommendations(results, kind: kind)
+        recommendationCache[cacheKey] = found
+        return found
+    }
+
+    static func recommendations(_ results: [[String: Any]], kind: Kind) -> [TMDBRecommendation] {
+        results.compactMap { result in
+            guard let id = result["id"] as? Int,
+                  let title = result[kind == .movie ? "title" : "name"] as? String else { return nil }
+            let date = result[kind == .movie ? "release_date" : "first_air_date"] as? String
+            return TMDBRecommendation(id: id, title: title,
+                                      originalTitle: result[kind == .movie ? "original_title" : "original_name"] as? String,
+                                      year: date.flatMap { Int($0.prefix(4)) })
+        }
     }
 
     // MARK: - Requests

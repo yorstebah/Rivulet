@@ -422,8 +422,88 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
             hubs.append(MediaHub(id: "\(library.id).favorites", providerID: id,
                                  title: String(localized: "Favorites"), style: .shelf, items: favorites))
         }
+        if let forYou = await forYouHub(in: library) { hubs.append(forYou) }
         if let added = try await recentlyAddedHub(in: library) { hubs.append(added) }
         return hubs
+    }
+
+    // MARK: - For You
+
+    private let forYouCache = OSAllocatedUnfairLock(initialState: [String: (key: String, ids: [String], at: Date)]())
+
+    /// The library's For You row (`XtreamForYou`), also on Home. Worked out again only when
+    /// what it starts from changes or after six hours: Home asks for its rows on every reload.
+    func forYouHub(in library: MediaLibrary, now: Date = Date()) async -> MediaHub? {
+        guard let kind = XtreamVODLibrary(rawValue: library.id) else { return nil }
+        let state = await state()
+        let seeds = XtreamForYou.seeds(state, source: id, library: kind, now: now)
+        guard !seeds.isEmpty else { return nil }
+        let hasKey = await tmdb.hasKey()
+        let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(state.records.count)"
+        let cached = forYouCache.withLock { $0[library.id] }
+        let ids: [String]
+        if let cached, cached.key == cacheKey, now.timeIntervalSince(cached.at) < 6 * 3600 {
+            ids = cached.ids
+        } else {
+            ids = await forYouIDs(kind, seeds: seeds, state: state, useTMDB: hasKey, now: now)
+            forYouCache.withLock { $0[library.id] = (cacheKey, ids, now) }
+        }
+        guard ids.count >= XtreamForYou.minimumRow, let items = try? await titles(ids, in: kind, state: state),
+              items.count >= XtreamForYou.minimumRow else { return nil }
+        return MediaHub(id: "\(library.id).forYou", providerID: id, title: String(localized: "For You"),
+                        style: .shelf, items: items, isPromoted: true)
+    }
+
+    private func forYouIDs(_ kind: XtreamVODLibrary, seeds: [XtreamForYou.Seed], state: XtreamVODMapping.State,
+                           useTMDB: Bool, now: Date) async -> [String] {
+        let seen = XtreamForYou.seen(state, source: id, library: kind)
+        let candidates: [XtreamForYou.Candidate]
+        var names: [String: (name: String, year: Int?)] = [:]
+        switch kind {
+        case .movies:
+            guard let movies = try? await catalog.movieLists().titles else { return [] }
+            candidates = movies.map { .init(id: $0.id, name: $0.name, year: $0.year, categoryId: $0.categoryId,
+                                            rating: $0.rating, addedAt: $0.addedAt) }
+        case .series:
+            guard let series = try? await catalog.seriesLists().titles else { return [] }
+            candidates = series.map { .init(id: $0.id, name: $0.name, year: $0.year, categoryId: $0.categoryId,
+                                            rating: $0.rating, addedAt: $0.updatedAt) }
+        }
+        let seedIDs = Set(seeds.map(\.id))
+        for candidate in candidates where seedIDs.contains(candidate.id) {
+            names[candidate.id] = (candidate.name, candidate.year)
+        }
+        var tmdbPicks: [String] = []
+        if useTMDB {
+            let tmdbKind: TMDBLookup.Kind = kind == .movies ? .movie : .tv
+            var lists: [(seedWeight: Double, recommendations: [TMDBRecommendation])] = []
+            for seed in seeds.prefix(XtreamForYou.tmdbSeedLimit) {
+                guard let title = names[seed.id] else { continue }
+                // The panel's TMDB id when it gives one (a film's info), else TMDB's search.
+                var tmdbID: Int?
+                if kind == .movies { tmdbID = (try? await catalog.movieInfo(seed.id))?.tmdbId.flatMap(Int.init) }
+                if tmdbID == nil {
+                    tmdbID = await tmdb.title(tmdbKind, tmdbID: nil, name: title.name, year: title.year)?.id
+                }
+                guard let tmdbID else { continue }
+                lists.append((seed.weight, await tmdb.recommendations(tmdbKind, tmdbID: tmdbID)))
+            }
+            tmdbPicks = XtreamForYou.tmdbPicks(lists, index: XtreamForYou.Index(candidates), seen: seen)
+        }
+        let categoryPicks = XtreamForYou.categoryPicks(candidates, seeds: seeds, seen: seen, now: now)
+        return XtreamForYou.merge(tmdbPicks, categoryPicks)
+    }
+
+    /// The library's titles with these ids, in this order.
+    private func titles(_ ids: [String], in kind: XtreamVODLibrary, state: XtreamVODMapping.State) async throws -> [MediaItem] {
+        switch kind {
+        case .movies:
+            let byID = Dictionary(try await catalog.movieLists().titles.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            return ids.compactMap { byID[$0] }.map { XtreamVODMapping.item($0, provider: id, state: state) }
+        case .series:
+            let byID = Dictionary(try await catalog.seriesLists().titles.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            return ids.compactMap { byID[$0] }.map { XtreamVODMapping.item($0, provider: id, state: state) }
+        }
     }
 
     func recentlyAddedHub(in library: MediaLibrary) async throws -> MediaHub? {
