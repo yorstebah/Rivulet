@@ -29,14 +29,16 @@ struct MacLiveListView: View {
     @State private var model = LiveCategoryList.build(LiveCategoryList.Input(channels: []))
     @State private var selectedId: String?
     @StateObject private var searcher = LiveChannelSearcher()
+    /// Counts five-minute steps: For You and the genre rows follow what is on.
+    @State private var tick = 0
 
     private var isPicker: Bool { if case .picker = mode { true } else { false } }
     private var currentId: String? { if case .picker(let current) = mode { current.id } else { nil } }
 
     private var modelKey: String {
-        // The lineup by its change counter (a regroup keeps its size), the guide only when a
-        // smart list reads it, and every other input of `liveCategoryList`.
-        "\(store.channelsVersion)|\(lists.listsReadGuide ? store.epgVersion : 0)|\(store.favoriteIds.hashValue)|"
+        // The lineup and guide by their change counters (a regroup keeps its size), the time
+        // (For You and the genre rows follow what is on), and every other input.
+        "\(store.channelsVersion)|\(store.epgVersion)|\(tick)|\(store.favoriteIds.hashValue)|"
             + "\(store.unfavoritedIds.hashValue)|\(store.recentChannelIds.hashValue)|"
             + "\(store.sources.map { "\($0.id)\($0.displayName)" }.hashValue)|"
             + "\(lists.lists.hashValue)|\(lists.pinnedCategoryKeys.hashValue)"
@@ -78,6 +80,12 @@ struct MacLiveListView: View {
         }
         .frame(width: isPicker ? 680 : nil, height: isPicker ? 520 : nil)
         .task(id: modelKey) { rebuild() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                tick += 1
+            }
+        }
         .onChange(of: selectedId) { _, id in if let id { rememberedId = id; searcher.query = "" } }
         .onDisappear { LiveStreamProber.shared.stop() }
     }
@@ -91,6 +99,8 @@ struct MacLiveListView: View {
     private func icon(for category: LiveCategory) -> String {
         switch category.kind {
         case .recent: "clock"
+        case .forYou: "sparkles"
+        case .onNow(let genre): genre.symbolName
         case .favorites: "star"
         case .all: "square.grid.2x2"
         case .list(let id): lists.list(id)?.isSmart == true ? "gearshape.2" : "list.bullet"

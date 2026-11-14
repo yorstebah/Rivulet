@@ -27,6 +27,10 @@ struct LiveCategory: Identifiable, Hashable {
         case group(String)
         /// One of the viewer's own lists, by its id (`LiveChannelList`).
         case list(String)
+        /// What's On's For You: what is on now that is like what the viewer watches.
+        case forYou
+        /// What's On's genre row: channels airing a programme of that genre now.
+        case onNow(LiveGenre)
     }
 
     let id: String
@@ -106,6 +110,10 @@ struct LiveCategoryList {
         var epg: [String: [UnifiedProgram]] = [:]
         /// The store's change counters, so smart lists are not matched again for nothing.
         var versions: LiveSmartRules.Versions?
+        /// What's On's For You picks, best first (`LiveShelves`).
+        var forYouIds: [String] = []
+        /// What's On's genre rows: each genre airing now and its channels.
+        var onNow: [(genre: LiveGenre, ids: [String])] = []
     }
 
     /// The column's rows in order, source headers included.
@@ -142,6 +150,8 @@ struct LiveCategoryList {
         }
         add(.recent, title: String(localized: "Recently Watched"), sourceId: nil,
             positions: input.recentChannelIds.compactMap { position[$0] })
+        add(.forYou, title: String(localized: "For You"), sourceId: nil,
+            positions: input.forYouIds.compactMap { position[$0] })
         let favorites = LiveTVDataStore.favorites(in: lineup, order: input.favoriteIds,
                                                   unfavorited: input.unfavoritedIds)
         add(.favorites, title: String(localized: "Favorites"), sourceId: nil,
@@ -153,6 +163,10 @@ struct LiveCategoryList {
             add(.list(list.id), title: list.name, sourceId: nil, positions: positions)
         }
         add(.all, title: String(localized: "All Channels"), sourceId: nil, positions: Array(lineup.indices))
+        // As What's On: a row per genre airing now, before the provider's own categories.
+        for row in input.onNow {
+            add(.onNow(row.genre), title: row.genre.title, sourceId: nil, positions: row.ids.compactMap { position[$0] })
+        }
 
         // Sections when two or more sources are in view, as the guide's source
         // tabs; with one, its groups follow All Channels directly.
@@ -221,6 +235,8 @@ struct LiveCategoryList {
         let source = sourceId ?? ""
         switch kind {
         case .recent: return "recent"
+        case .forYou: return "foryou"
+        case .onNow(let genre): return "onnow|\(genre.rawValue)"
         case .favorites: return "favorites"
         case .all: return "all|\(source)"
         case .sourceHeader: return "source|\(source)"
@@ -253,7 +269,7 @@ struct LiveCategoryList {
         guard let row = category(categoryId) else { return nil }
         let source = row.sourceId ?? sourceIdFilter
         switch row.kind {
-        case .recent: return LiveGuideTarget(sourceId: sourceIdFilter, tab: .all)
+        case .recent, .forYou, .onNow: return LiveGuideTarget(sourceId: sourceIdFilter, tab: .all)
         case .favorites: return LiveGuideTarget(sourceId: sourceIdFilter, tab: .favorites)
         case .all: return LiveGuideTarget(sourceId: source, tab: .all)
         case .group(let title): return LiveGuideTarget(sourceId: source, tab: .group(title))
@@ -306,7 +322,11 @@ struct LiveCategoryList {
 extension LiveTVDataStore {
     /// The List layout's categories for a source (nil: every source).
     func liveCategoryList(sourceIdFilter: String?, collapsedSourceIds: Set<String> = []) -> LiveCategoryList {
-        LiveCategoryList.build(LiveCategoryList.Input(
+        // For You and the genre rows are picked as What's On picks them, so both layouts agree.
+        let found = liveDiscovery(sourceIdFilter: sourceIdFilter)
+        let forYou = found.forYou.map(\.id)
+        let onNow = found.byGenre.map { (genre: $0.genre, ids: $0.channels.map(\.id)) }
+        return LiveCategoryList.build(LiveCategoryList.Input(
             channels: channels,
             sources: sources.map { (id: $0.id, name: $0.displayName) },
             favoriteIds: favoriteIds, unfavoritedIds: unfavoritedIds,
@@ -314,6 +334,6 @@ extension LiveTVDataStore {
             sourceIdFilter: sourceIdFilter, collapsedSourceIds: collapsedSourceIds,
             lists: LiveChannelListStore.shared.lists,
             pinnedKeys: LiveChannelListStore.shared.pinnedCategoryKeys,
-            epg: epg, versions: lineupVersions))
+            epg: epg, versions: lineupVersions, forYouIds: forYou, onNow: onNow))
     }
 }

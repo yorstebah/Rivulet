@@ -84,6 +84,7 @@ final class LiveListViewController: UIViewController {
     private var pendingFocus: UIFocusEnvironment?
     private var cancellables = Set<AnyCancellable>()
     private var minuteTimer: Timer?
+    private var timerTicks = 0
     /// Measures the rows on screen once they settle (`LiveStreamProber`).
     private var probeWork: DispatchWorkItem?
     private var guideSwipe: DirectionalInputBinding?
@@ -118,13 +119,11 @@ final class LiveListViewController: UIViewController {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.rebuild() }
             .store(in: &cancellables)
-        // A guide update changes what rows say; which rows there are only through a smart
-        // list with a genre rule, which reads the guide.
+        // A guide update changes what rows say, and which rows there are: For You and the
+        // genre rows come from what is on, as may a smart list with a genre rule.
         store.$epg
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in
-                if LiveChannelListStore.shared.listsReadGuide { self?.rebuild() } else { self?.refreshVisibleRows() }
-            }
+            .sink { [weak self] _ in self?.rebuild() }
             .store(in: &cancellables)
         store.$isLoadingChannels
             .receive(on: DispatchQueue.main)
@@ -159,8 +158,11 @@ final class LiveListViewController: UIViewController {
         // What is on, and how far through, moves by the minute.
         let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.updateClock()
-                self?.refreshVisibleRows()
+                guard let self else { return }
+                self.updateClock()
+                self.timerTicks += 1
+                // For You and the genre rows follow what is on: rebuilt every five minutes.
+                if self.timerTicks % 10 == 0 { self.rebuild() } else { self.refreshVisibleRows() }
             }
         }
         RunLoop.main.add(timer, forMode: .common)

@@ -42,4 +42,49 @@ final class LiveListTextTests: XCTestCase {
         let sport = sections.last?.rows.last?.id
         XCTAssertEqual(list.startingCategoryId(remembered: sport), sport)
     }
+
+    func test_forYouAndGenreRows_followWhatsOn_andOpenTheGuideOnAllChannels() {
+        let channels = (1...6).map { UnifiedChannel(id: "x:\($0)", sourceType: .xtream, sourceId: "x", name: "C\($0)") }
+        let list = LiveCategoryList.build(LiveCategoryList.Input(
+            channels: channels, recentChannelIds: ["x:6"],
+            forYouIds: ["x:3", "x:1", "gone"], onNow: [(.sports, ["x:2", "x:4"]), (.news, ["x:5"])]))
+        let ids = list.categories.map(\.id)
+        XCTAssertEqual(Array(ids.prefix(5)), ["recent", "foryou", "all|", "onnow|Sports", "onnow|News"])
+        XCTAssertEqual(list.channels(in: "foryou").map(\.id), ["x:3", "x:1"])
+        XCTAssertEqual(list.category("onnow|Sports")?.title, LiveGenre.sports.title)
+        XCTAssertEqual(list.guideTarget(for: "onnow|Sports")?.tab, .all)
+        XCTAssertEqual(list.guideTarget(for: "foryou")?.tab, .all)
+        // Back from the guide on a channel the row holds: the row itself again.
+        let target = list.guideTarget(for: "onnow|Sports")!
+        XCTAssertEqual(list.categoryId(backFrom: target, openedFrom: "onnow|Sports", channelId: "x:4"), "onnow|Sports")
+    }
+
+    func test_whatsOnRows_onALargeLineup_stayQuick() {
+        let now = Date()
+        let names = ["Sport 1", "News 24", "Kids TV", "Film One", "Nature", "Music Hits", "Comedy"]
+        let channels = (0..<23_700).map { index in
+            UnifiedChannel(id: "x:\(index)", sourceType: .xtream, sourceId: "x", name: "\(names[index % 7]) \(index)",
+                           groupTitle: "┃NL┃ GROUP \(index % 400)")
+        }
+        var epg: [String: [UnifiedProgram]] = [:]
+        for channel in channels.prefix(6000) {
+            epg[channel.id] = (0..<12).map { slot in
+                UnifiedProgram(id: "\(channel.id):\(slot)", channelId: channel.id, title: "Show \(slot)",
+                               startTime: now.addingTimeInterval(Double(slot - 1) * 1800),
+                               endTime: now.addingTimeInterval(Double(slot) * 1800), category: names[slot % 7])
+            }
+        }
+        let input = LiveShelves.Input(channels: channels, epg: epg)
+        let start = Date()
+        _ = LiveShelves.discovery(input, sourceIdFilter: nil, now: now)
+        let first = Date().timeIntervalSince(start)
+        let again = Date()
+        let found = LiveShelves.discovery(input, sourceIdFilter: nil, now: now)
+        let second = Date().timeIntervalSince(again)
+        if let path = ProcessInfo.processInfo.environment["RIVULET_TIMING_FILE"] {
+            try? "first \(Int(first * 1000)) ms, then \(Int(second * 1000)) ms, \(found.byGenre.count) genre rows"
+                .write(toFile: path, atomically: true, encoding: .utf8)
+        }
+        XCTAssertFalse(found.byGenre.isEmpty)
+    }
 }
