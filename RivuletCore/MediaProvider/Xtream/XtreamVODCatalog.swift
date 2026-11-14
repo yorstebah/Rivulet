@@ -234,6 +234,16 @@ actor XtreamVODCatalog {
         guard let directory, let url = file(name), let data = try? JSONEncoder().encode(lists) else { return }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)
+        // Copies an older build wrote: tens of MB each, never read again.
+        let safe = String(sourceID.map { $0.isLetter || $0.isNumber ? $0 : "_" })
+        for old in Self.olderVersions(of: name) {
+            try? FileManager.default.removeItem(at: directory.appending(component: "\(safe)-\(old).json"))
+        }
+    }
+
+    /// The names earlier cache versions used for a list ("movies", "movies-v2", "movies-v3").
+    nonisolated static func olderVersions(of name: String) -> [String] {
+        [name, "\(name)-v2", "\(name)-v3"]
     }
 
     /// The source was removed: its lists go too.

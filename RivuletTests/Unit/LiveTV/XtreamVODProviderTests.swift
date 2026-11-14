@@ -164,6 +164,19 @@ final class XtreamVODProviderTests: XCTestCase {
 
     // MARK: - Cache
 
+    func test_savingAList_removesTheCopiesOlderBuildsLeft() async throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let safe = String(source.map { $0.isLetter || $0.isNumber ? $0 : "_" })
+        let old = ["movies", "movies-v2", "movies-v3"].map { directory.appending(component: "\(safe)-\($0).json") }
+        for url in old { try Data("old".utf8).write(to: url) }
+        let provider = provider()
+        let movies = try await provider.libraries()[0]
+        _ = try await provider.items(in: movies, sort: .titleAsc, page: Page(offset: 0, limit: 5))
+        for url in old { XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), url.lastPathComponent) }
+        let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        XCTAssertTrue(names.contains("\(safe)-movies-v4.json"))
+    }
+
     func test_lists_areFetchedOnce_thenReadFromDisk_andAStaleCopyOutlivesAFailure() async throws {
         let first = provider()
         _ = try await first.libraries()
