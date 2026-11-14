@@ -55,6 +55,10 @@ enum XtreamVODSources {
     static func setLanguages(_ languages: XtreamVODLanguages, defaults: UserDefaults = .standard) {
         defaults.set(languages.origins, forKey: languagesKey)
         defaults.removeObject(forKey: legacyLanguagesKey)
+        // "Show: French" ends when French is no longer one of the viewer's languages (All Languages keeps it).
+        if let focus = languageFocus(defaults: defaults), !languages.showsEverything, !languages.languages.contains(focus) {
+            defaults.removeObject(forKey: languageFocusKey)
+        }
         changed()
     }
 
@@ -70,7 +74,8 @@ enum XtreamVODSources {
     /// What the listings show: the viewer's languages, narrowed to the chosen one when there is one.
     static func shownLanguages() -> XtreamVODLanguages {
         let languages = self.languages()
-        guard let focus = languageFocus() else { return languages }
+        // A choice another device left behind for a language this viewer no longer keeps is not followed.
+        guard let focus = languageFocus(), languages.showsEverything || languages.languages.contains(focus) else { return languages }
         return languages.focused(on: focus, available: allAvailableOrigins.map(\.origin))
     }
 

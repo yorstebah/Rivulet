@@ -825,6 +825,11 @@ final class EPGContainerView: UIView {
         super.didUpdateFocus(in: context, with: coordinator)
         if context.nextFocusedView === initialFocusTarget {
             initialFocusTarget = nil
+        } else if initialFocusResolver != nil, initialFocusTarget == nil,
+                  let next = context.nextFocusedView, let grid = collectionView, next.isDescendant(of: grid) {
+            // The channel's row has no cell and the viewer is already among the programmes:
+            // the first entry is over, so a later move must not be pulled back to that channel.
+            initialFocusResolver = nil
         } else if let target = initialFocusTarget, let next = context.nextFocusedView, next.isDescendant(of: self) {
             // Focus came in elsewhere (the pills): on to the channel's programme.
             initialFocusTarget = nil

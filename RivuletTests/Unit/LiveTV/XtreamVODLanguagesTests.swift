@@ -70,6 +70,46 @@ final class XtreamVODLanguagesTests: XCTestCase {
                        ["nl", "en", "fr"])
     }
 
+    /// Belgium, Canada and Switzerland each belong to one language, so French never moves the others.
+    func test_tickingALanguage_leavesTheOthersAsTheyWere() {
+        let dutch = XtreamVODLanguages.defaults(preferredLanguages: ["nl-NL"])
+        XCTAssertEqual(XtreamVODLanguages.origins(ofLanguage: "fr"), ["FR"])
+        let withFrench = dutch.toggling("fr", available: ["FR", "CH", "BE"])
+        XCTAssertEqual(withFrench.origins, dutch.origins + ["FR"])
+        XCTAssertEqual(withFrench.languages, ["multi", "nl", "en", "fr"])
+        XCTAssertEqual(withFrench.toggling("fr").origins, dutch.origins)
+        XCTAssertEqual(dutch.toggling("nl").languages, ["multi", "en"])
+        XCTAssertEqual(XtreamVODLanguages.defaults(preferredLanguages: ["fr-FR"]).languages, ["multi", "fr", "en"])
+        XCTAssertEqual(XtreamVODLanguages.defaults(preferredLanguages: ["no-NO"]).origins.prefix(2), ["MULTI", "NO"])
+        // A panel's own group joins and leaves with its language.
+        let exyu = dutch.toggling("EXYU", available: ["EXYU"])
+        XCTAssertEqual(exyu.origins.last, "EXYU")
+        XCTAssertEqual(exyu.toggling("EXYU").origins, dutch.origins)
+    }
+
+    func test_settingsOrder_chosenFirstThenByTitles() {
+        let mine = XtreamVODLanguages(origins: ["MULTI", "NL", "GB"])
+        XCTAssertEqual(mine.order(available: [("FR", 9), ("GB", 5), ("NL", 3), ("TR", 1)]), ["nl", "en", "fr", "tr"])
+        XCTAssertEqual(mine.order(available: []), ["multi", "nl", "en"])
+    }
+
+    @MainActor
+    func test_aNarrowedLanguage_endsWhenItIsNoLongerKept() throws {
+        let name = "XtreamVODLanguagesTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        XtreamVODSources.setLanguages(XtreamVODLanguages(origins: ["NL", "FR"]), defaults: defaults)
+        XtreamVODSources.setLanguageFocus("fr", defaults: defaults)
+        XtreamVODSources.setLanguages(XtreamVODLanguages(origins: ["NL", "FR", "GB"]), defaults: defaults)
+        XCTAssertEqual(XtreamVODSources.languageFocus(defaults: defaults), "fr")
+        XtreamVODSources.setLanguages(XtreamVODLanguages(origins: ["NL"]), defaults: defaults)
+        XCTAssertNil(XtreamVODSources.languageFocus(defaults: defaults))
+        // All Languages keeps a choice: the library still offers every language.
+        XtreamVODSources.setLanguageFocus("fr", defaults: defaults)
+        XtreamVODSources.setLanguages(.everything, defaults: defaults)
+        XCTAssertEqual(XtreamVODSources.languageFocus(defaults: defaults), "fr")
+    }
+
     func test_summary_readsAsLanguages() {
         let summary = XtreamVODLanguages.defaults(preferredLanguages: ["nl-NL"]).summary
         XCTAssertEqual(summary.components(separatedBy: ", ").count, 3, summary)

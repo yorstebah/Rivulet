@@ -205,6 +205,7 @@ private struct MacXtreamVODSection: View {
     let sourceId: String
     @State private var enabled = true
     @State private var tmdbKey = ""
+    @State private var loadedKey = ""
 
     var body: some View {
         Section {
@@ -219,11 +220,18 @@ private struct MacXtreamVODSection: View {
         .onAppear {
             enabled = XtreamVODSources.isEnabled(sourceId)
             tmdbKey = KeychainHelper.get(TMDBLookup.keychainKey) ?? ""
+            loadedKey = tmdbKey
         }
         .onDisappear(perform: saveKey)
     }
 
-    private func saveKey() { TMDBKeyStore.set(tmdbKey) }
+    /// Only what the viewer changed in this field: an untouched one (a second source's, or one
+    /// opened before a synced key arrived) must not write its old or empty text over the key.
+    private func saveKey() {
+        guard tmdbKey != loadedKey else { return }
+        TMDBKeyStore.set(tmdbKey)
+        loadedKey = tmdbKey
+    }
 }
 
 /// Rivulet's favorites in order: drag to reorder, Delete to remove.

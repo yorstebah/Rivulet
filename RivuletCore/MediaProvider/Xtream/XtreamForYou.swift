@@ -94,7 +94,7 @@ enum XtreamForYou {
     /// Titles not to offer: those already watched or begun, and the favorites.
     static func seen(_ state: XtreamVODMapping.State, source: String, library: XtreamVODLibrary) -> Set<String> {
         var ids = Set<String>()
-        for key in state.records.keys {
+        for (key, record) in state.records where !record.isBlank {
             switch XtreamVODMapping.id(fromKey: key, source: source) {
             case .movie(let id) where library == .movies: ids.insert(id)
             case .episode(let seriesID, _) where library == .series: ids.insert(seriesID)

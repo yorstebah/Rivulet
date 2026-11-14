@@ -85,6 +85,8 @@ final class LiveListViewController: UIViewController {
     private var cancellables = Set<AnyCancellable>()
     private var minuteTimer: Timer?
     private var timerTicks = 0
+    /// A guide or timer rebuild waited because it would have removed the row being browsed.
+    private var rebuildHeld = false
     /// Measures the rows on screen once they settle (`LiveStreamProber`).
     private var probeWork: DispatchWorkItem?
     private var guideSwipe: DirectionalInputBinding?
@@ -121,9 +123,16 @@ final class LiveListViewController: UIViewController {
             .store(in: &cancellables)
         // A guide update changes what rows say, and which rows there are: For You and the
         // genre rows come from what is on, as may a smart list with a genre rule.
+        // The rows' text follows at once; the categories at most every few seconds, since a
+        // launch delivers the guide in many batches and each rebuild walks the whole lineup.
         store.$epg
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in self?.rebuild() }
+            .sink { [weak self] _ in self?.refreshVisibleRows() }
+            .store(in: &cancellables)
+        store.$epg
+            .dropFirst()
+            .throttle(for: .seconds(5), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in self?.rebuild(keepingSelection: true) }
             .store(in: &cancellables)
         store.$isLoadingChannels
             .receive(on: DispatchQueue.main)
@@ -162,7 +171,11 @@ final class LiveListViewController: UIViewController {
                 self.updateClock()
                 self.timerTicks += 1
                 // For You and the genre rows follow what is on: rebuilt every five minutes.
-                if self.timerTicks % 10 == 0 { self.rebuild() } else { self.refreshVisibleRows() }
+                if self.timerTicks % 10 == 0 || self.rebuildHeld {
+                    self.rebuild(keepingSelection: true)
+                } else {
+                    self.refreshVisibleRows()
+                }
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -522,10 +535,21 @@ final class LiveListViewController: UIViewController {
     /// Rebuilds the categories from the store, keeping the selection where it
     /// still exists. A selected row that went away (its last favourite
     /// removed) hands over to the first category.
-    private func rebuild() {
+    ///
+    /// `keepingSelection`: a rebuild nobody asked for (the guide moved on, the timer). An on-now
+    /// row (For You, a genre) can end while the viewer is in it; the rebuild then waits until
+    /// they have left the row, so the list never jumps to another category under them.
+    private func rebuild(keepingSelection: Bool = false) {
         guard isViewLoaded else { return }
-        list = LiveTVDataStore.shared.liveCategoryList(sourceIdFilter: sourceIdFilter,
-                                                       collapsedSourceIds: collapsedSourceIds)
+        let next = LiveTVDataStore.shared.liveCategoryList(sourceIdFilter: sourceIdFilter,
+                                                           collapsedSourceIds: collapsedSourceIds)
+        if keepingSelection, let selectedId, list.category(selectedId) != nil, next.category(selectedId) == nil {
+            rebuildHeld = true
+            refreshVisibleRows()
+            return
+        }
+        rebuildHeld = false
+        list = next
         let ids = list.categories.map(\.id)
         let existing = Set(categoryData.snapshot().itemIdentifiers)
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
@@ -557,7 +581,11 @@ final class LiveListViewController: UIViewController {
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(shownIds)
-        if sameCategory {
+        if sameCategory, oldIds == shownIds {
+            // Nothing moved (the usual guide update): only the rows on screen need their new text,
+            // not a diff of what can be tens of thousands of rows.
+            refreshVisibleRows()
+        } else if sameCategory {
             snapshot.reconfigureItems(oldIds.filter { shownById[$0] != nil })
             channelData.apply(snapshot, animatingDifferences: false)
         } else {

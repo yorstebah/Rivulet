@@ -23,14 +23,7 @@ struct IOSContentLanguagesView: View {
                     row(title: XtreamVODLanguages.name(ofLanguage: language),
                         count: counts.first { $0.language == language }?.count,
                         selected: languages.languages.contains(language)) {
-                        var next = languages
-                        let origins = XtreamVODLanguages.origins(ofLanguage: language, available: available.map(\.origin))
-                        if next.languages.contains(language) {
-                            next.origins.removeAll(where: Set(origins).contains)
-                        } else {
-                            next.origins += origins.filter { !next.origins.contains($0) }
-                        }
-                        update(next)
+                        update(languages.toggling(language, available: available.map(\.origin)))
                     }
                 }
                 if available.isEmpty { ProgressView() }
@@ -54,11 +47,7 @@ struct IOSContentLanguagesView: View {
     private var counts: [(language: String, count: Int)] { XtreamVODLanguages.languageCounts(available) }
 
     /// The chosen languages in order of preference, then the rest by how many titles they hold.
-    private var order: [String] {
-        let carried = Set(counts.map(\.language))
-        return languages.languages.filter { carried.contains($0) || available.isEmpty }
-            + counts.map(\.language).filter { !languages.languages.contains($0) }
-    }
+    private var order: [String] { languages.order(available: available) }
 
     private func update(_ next: XtreamVODLanguages) {
         languages = next

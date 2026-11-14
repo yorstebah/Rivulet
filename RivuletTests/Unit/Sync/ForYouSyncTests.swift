@@ -43,6 +43,18 @@ final class ForYouSyncTests: XCTestCase {
         XCTAssertEqual(merged["x|movie|3"]?["watched"] as? Bool, true)
     }
 
+    /// Mark as Unwatched on one device: its blank, newer record replaces the other device's place.
+    func test_watchProgress_anUnwatchedTitleStaysUnwatched() throws {
+        let local: [String: Any] = ["x|movie|1": ["position": 0, "watched": true, "updatedAt": 10]]
+        let cloud: [String: Any] = ["x|movie|1": ["position": 0, "watched": false, "updatedAt": 20]]
+        let here = try object(SyncCatalog.incoming("xtreamWatchProgress", cloud: data(cloud), local: data(local)),
+                              as: [String: [String: Any]].self)
+        XCTAssertEqual(here["x|movie|1"]?["watched"] as? Bool, false)
+        let there = try object(SyncCatalog.incoming("xtreamWatchProgress", cloud: data(local), local: data(cloud)),
+                               as: [String: [String: Any]].self)
+        XCTAssertEqual(there["x|movie|1"]?["watched"] as? Bool, false)
+    }
+
     func test_watchProgress_sendsTheNewest400_underICloudsLimit() throws {
         var many: [String: Any] = [:]
         for index in 0..<1000 {

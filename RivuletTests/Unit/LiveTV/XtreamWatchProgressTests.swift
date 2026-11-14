@@ -72,10 +72,20 @@ final class XtreamWatchProgressTests: XCTestCase {
         XCTAssertEqual(store.inProgress(limit: 1), [episode])
     }
 
-    func test_markUnwatched_forgetsTheTitle() {
+    /// The record stays, emptied and newer, so iCloud's newest-wins merge carries the change
+    /// instead of bringing the title back from another device.
+    func test_markUnwatched_leavesABlankNewerRecord() throws {
         let store = XtreamWatchProgressStore(defaults: defaults)
-        store.update(movie, position: 1200, duration: 6000)
-        store.markUnwatched(movie)
-        XCTAssertNil(XtreamWatchProgressStore(defaults: defaults).record(movie))
+        store.update(movie, position: 1200, duration: 6000, now: Date(timeIntervalSince1970: 100))
+        store.markUnwatched(movie, now: Date(timeIntervalSince1970: 200))
+        let record = try XCTUnwrap(XtreamWatchProgressStore(defaults: defaults).record(movie))
+        XCTAssertTrue(record.isBlank)
+        XCTAssertEqual(record.duration, 6000)
+        XCTAssertEqual(record.updatedAt, Date(timeIntervalSince1970: 200))
+        XCTAssertEqual(store.inProgress(), [])
+        XCTAssertNil(XtreamVODMapping.userState(record).lastViewedAt)
+        // Nothing to forget: no record is made for a title never played.
+        store.markUnwatched("other")
+        XCTAssertNil(store.record("other"))
     }
 }

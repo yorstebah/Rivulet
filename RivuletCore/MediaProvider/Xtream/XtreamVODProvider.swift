@@ -538,22 +538,34 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
                 running[library.id] = (cacheKey, task)
                 return task
             }
-            let fresh = await withTaskGroup(of: [String]?.self) { group in
-                group.addTask { await work.value }
-                group.addTask {
-                    try? await Task.sleep(for: .seconds(3))
-                    return nil
-                }
-                let first = await group.next() ?? nil
-                group.cancelAll()
-                return first
-            }
+            let fresh = await Self.value(of: work, within: 3)
             if let fresh { ids = fresh }
         }
         guard let ids, ids.count >= XtreamForYou.minimumRow, let items = try? await titles(ids, in: kind, state: state),
               items.count >= XtreamForYou.minimumRow else { return nil }
         return MediaHub(id: "\(library.id).forYou", providerID: id, title: String(localized: "For You"),
                         style: .shelf, items: items, isPromoted: true)
+    }
+
+    /// The task's result, or nil once `seconds` have passed; the task runs on and fills the cache
+    /// for the next load. Not a task group: a group waits for every child before it returns, and
+    /// awaiting another task's value does not end when cancelled, so the wait had no limit.
+    private static func value<T: Sendable>(of task: Task<T, Never>, within seconds: Double) async -> T? {
+        let answered = OSAllocatedUnfairLock(initialState: false)
+        return await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
+            let answer: @Sendable (T?) -> Void = { value in
+                let first = answered.withLock { done -> Bool in
+                    defer { done = true }
+                    return !done
+                }
+                if first { continuation.resume(returning: value) }
+            }
+            Task { answer(await task.value) }
+            Task {
+                try? await Task.sleep(for: .seconds(seconds))
+                answer(nil)
+            }
+        }
     }
 
     private func forYouIDs(_ kind: XtreamVODLibrary, seeds: [XtreamForYou.Seed], state: XtreamVODMapping.State,

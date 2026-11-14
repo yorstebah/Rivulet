@@ -23,7 +23,8 @@ nonisolated struct XtreamVODLanguages: Sendable, Hashable, Codable {
 
     static let everything = XtreamVODLanguages(origins: [])
 
-    /// Countries whose copies speak a language, for the defaults. Belgium is Dutch and French.
+    /// Countries whose copies speak a language. A country listed twice counts for the first
+    /// language in `languageOfRegion`'s order only (`regions(ofLanguage:)`).
     private static let regionsByLanguage: [String: [String]] = [
         "nl": ["NL", "BE"], "en": ["GB", "US", "CA", "AU", "IE", "NZ"], "de": ["DE", "AT", "CH"],
         "fr": ["FR", "BE", "CA", "CH"], "es": ["ES", "MX"], "pt": ["PT", "BR"], "it": ["IT"],
@@ -64,8 +65,34 @@ nonisolated struct XtreamVODLanguages: Sendable, Hashable, Codable {
     /// Every origin a language covers: its countries, and those `available` lists for it.
     static func origins(ofLanguage language: String, available: [String] = []) -> [String] {
         if language == "multi" { return ["MULTI"] }
-        let known = regionsByLanguage[language] ?? [language]
+        let known = regionsByLanguage[language] != nil ? regions(ofLanguage: language) : [language]
         return known + available.filter { self.language(of: $0) == language && !known.contains($0) }
+    }
+
+    /// A language's own countries: those read as it. A country with several languages belongs to
+    /// one (Belgium to Dutch), so no two languages share a country and ticking one never moves another.
+    private static func regions(ofLanguage code: String) -> [String] {
+        guard let regions = regionsByLanguage[code], let own = regions.first.map(language(of:)) else { return [] }
+        return regions.filter { language(of: $0) == own }
+    }
+
+    /// The viewer ticked or unticked a language in Settings: its origins join at the end, or all leave.
+    func toggling(_ language: String, available: [String] = []) -> XtreamVODLanguages {
+        var next = self
+        if languages.contains(language) {
+            next.origins.removeAll { Self.language(of: $0) == language }
+        } else {
+            next.origins += Self.origins(ofLanguage: language, available: available).filter { !origins.contains($0) }
+        }
+        return next
+    }
+
+    /// Settings' rows: the chosen languages in order of preference (those the titles carry, or all
+    /// of them while the lists load), then the rest by how many titles they hold.
+    func order(available: [(origin: String, count: Int)]) -> [String] {
+        let counts = Self.languageCounts(available).map(\.language)
+        let carried = Set(counts), chosen = languages
+        return chosen.filter { carried.contains($0) || available.isEmpty } + counts.filter { !chosen.contains($0) }
     }
 
     /// The languages these origins make, in their order: Multi, Dutch, English…
@@ -94,7 +121,7 @@ nonisolated struct XtreamVODLanguages: Sendable, Hashable, Codable {
         var origins = ["MULTI"]
         let codes = preferredLanguages.map { String($0.split(separator: "-").first ?? "").lowercased() } + ["en"]
         for code in codes where !code.isEmpty {
-            let regions = regionsByLanguage[code] ?? [code.uppercased()]
+            let regions = regionsByLanguage[code] != nil ? regions(ofLanguage: code) : [code.uppercased()]
             for region in regions where !origins.contains(region) { origins.append(region) }
         }
         return XtreamVODLanguages(origins: origins)

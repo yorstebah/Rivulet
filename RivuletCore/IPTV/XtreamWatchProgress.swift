@@ -20,6 +20,9 @@ struct XtreamWatchRecord: Codable, Equatable, Sendable {
     var duration: TimeInterval?
     var watched: Bool
     var updatedAt: Date
+
+    /// Neither watched nor begun: what Mark as Unwatched leaves behind.
+    var isBlank: Bool { !watched && position <= 0 }
 }
 
 @MainActor
@@ -84,8 +87,11 @@ final class XtreamWatchProgressStore: ObservableObject {
         save()
     }
 
-    func markUnwatched(_ key: String) {
-        records[key] = nil
+    /// Keeps an empty record instead of removing it: iCloud merges the newest record per title, so
+    /// a removed one would come back from a device that still had it.
+    func markUnwatched(_ key: String, now: Date = Date()) {
+        guard let record = records[key] else { return }
+        records[key] = XtreamWatchRecord(position: 0, duration: record.duration, watched: false, updatedAt: now)
         save()
     }
 

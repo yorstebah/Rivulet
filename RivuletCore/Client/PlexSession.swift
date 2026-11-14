@@ -63,7 +63,15 @@ final class PlexSession: ObservableObject {
         // Jellyfin and Emby sign in and out through the registry; follow it.
         secondaryIDs = MediaProviderRegistry.shared.secondaryProviders.map(\.id)
         MediaProviderRegistry.shared.onSecondaryProvidersChanged = { [weak self] providers in
-            // Film and series languages changed here: Home's rows follow, as after a watch-state change.
+            // The servers' Live TV follows every sign-in, sign-out and profile change (shared with tvOS).
+            OtherServerKind.configureLiveTV(secondary: providers, restricted: PlexUserProfileManager.shared.isRestrictedProfile)
+            guard let self else { return }
+            let ids = providers.map(\.id)
+            defer { secondaryIDs = ids }
+            guard !repopulating, ids != secondaryIDs else { return }
+            Task { await self.refresh() }
+        }
+        // Film and series languages changed here: Home's rows follow, as after a watch-state change.
         NotificationCenter.default.addObserver(forName: XtreamVODSources.languagesChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -77,14 +85,6 @@ final class PlexSession: ObservableObject {
                     || keys.contains(XtreamVODSources.languagesKey)
                     || keys.contains(XtreamVODSources.languageFocusKey) else { return }
             Task { await self?.watchStateDidChange() }
-        }
-        // The servers' Live TV follows every sign-in, sign-out and profile change (shared with tvOS).
-            OtherServerKind.configureLiveTV(secondary: providers, restricted: PlexUserProfileManager.shared.isRestrictedProfile)
-            guard let self else { return }
-            let ids = providers.map(\.id)
-            defer { secondaryIDs = ids }
-            guard !repopulating, ids != secondaryIDs else { return }
-            Task { await self.refresh() }
         }
         // The registry was filled before this ran, so the first pass is ours.
         OtherServerKind.configureLiveTV(restricted: PlexUserProfileManager.shared.isRestrictedProfile)

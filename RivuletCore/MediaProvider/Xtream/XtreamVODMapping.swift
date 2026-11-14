@@ -108,7 +108,7 @@ nonisolated enum XtreamVODMapping {
 
     static func userState(_ record: XtreamWatchRecord?, favorite: Bool = false) -> MediaUserState {
         MediaUserState(isPlayed: record?.watched ?? false, viewOffset: record?.position ?? 0,
-                       isFavorite: favorite, lastViewedAt: record?.updatedAt)
+                       isFavorite: favorite, lastViewedAt: record.flatMap { $0.isBlank ? nil : $0.updatedAt })
     }
 
     // MARK: Items

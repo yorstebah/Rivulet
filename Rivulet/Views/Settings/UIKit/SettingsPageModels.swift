@@ -788,8 +788,7 @@ enum SettingsContent {
         let available = XtreamVODSources.allAvailableOrigins
         let counts = Dictionary(XtreamVODLanguages.languageCounts(available).map { ($0.language, $0.count) },
                                 uniquingKeysWith: { first, _ in first })
-        let order = current.languages.filter { counts[$0] != nil || available.isEmpty }
-            + XtreamVODLanguages.languageCounts(available).map(\.language).filter { !current.languages.contains($0) }
+        let order = current.order(available: available)
         var rows = [SettingsRowItem(id: "lang_all", title: "All Languages", kind: .selectable(
             isSelected: { XtreamVODSources.languages().showsEverything },
             value: { nil },
@@ -805,14 +804,8 @@ enum SettingsContent {
                 isSelected: { XtreamVODSources.languages().languages.contains(language) },
                 value: { counts[language].map { $0.formatted() } },
                 handler: { vc in
-                    var languages = XtreamVODSources.languages()
-                    let origins = XtreamVODLanguages.origins(ofLanguage: language, available: available.map(\.origin))
-                    if languages.languages.contains(language) {
-                        languages.origins.removeAll(where: Set(origins).contains)
-                    } else {
-                        languages.origins += origins.filter { !languages.origins.contains($0) }
-                    }
-                    XtreamVODSources.setLanguages(languages)
+                    XtreamVODSources.setLanguages(XtreamVODSources.languages()
+                        .toggling(language, available: available.map(\.origin)))
                     (vc as? SettingsPageViewController)?.reloadRows()
                 })))
         }

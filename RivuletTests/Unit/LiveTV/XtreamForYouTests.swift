@@ -39,6 +39,8 @@ final class XtreamForYouTests: XCTestCase {
         let movies = XtreamForYou.seeds(state, source: source, library: .movies, now: now).map(\.id)
         XCTAssertEqual(movies, ["fav", "watched", "begun"])
         XCTAssertEqual(XtreamForYou.seeds(state, source: source, library: .series, now: now).map(\.id), ["s1"])
+        // Marked unwatched: a blank record, offered again.
+        state.records[XtreamVODMapping.movieKey(source: source, movieID: "unwatched")] = record(false, position: 0)
         XCTAssertEqual(XtreamForYou.seen(state, source: source, library: .movies), ["watched", "begun", "glance", "fav"])
     }
 
