@@ -86,8 +86,9 @@ extension Array where Element == LiveCardItem {
 
 extension LiveTVDataStore {
     /// The What's On rows for a source (nil: every source). Rows may be empty.
-    func whatsOnShelves(sourceIdFilter: String?, now: Date = Date()) -> [LiveShelf] {
-        LiveShelves.build(shelvesInput, sourceIdFilter: sourceIdFilter, now: now)
+    /// `favoritesOnly`: the Favorites row alone, for Home, without the rows it does not show.
+    func whatsOnShelves(sourceIdFilter: String?, now: Date = Date(), favoritesOnly: Bool = false) -> [LiveShelf] {
+        LiveShelves.build(shelvesInput, sourceIdFilter: sourceIdFilter, now: now, favoritesOnly: favoritesOnly)
     }
 
     /// For You and the genre rows alone (the List's), as What's On picks them. Kept until the
@@ -200,7 +201,7 @@ enum LiveShelves {
         return discovery(airing: airing, current: current, input: input, now: now)
     }
 
-    static func build(_ input: Input, sourceIdFilter: String?, now: Date) -> [LiveShelf] {
+    static func build(_ input: Input, sourceIdFilter: String?, now: Date, favoritesOnly: Bool = false) -> [LiveShelf] {
         let epg = input.epg
         // Each row asks again for the same channel; scan its guide once per build.
         var currentMemo: [String: UnifiedProgram?] = [:]
@@ -259,7 +260,8 @@ enum LiveShelves {
             shelves.append(LiveShelf(id: "recent", title: String(localized: "Recently Watched"), items: recent))
         }
 
-        let found = discovery(airing: airing, current: current, input: input, now: now)
+        // Home's Favorites row needs none of this, and a large lineup takes a moment to rank.
+        let found = favoritesOnly ? Discovery() : discovery(airing: airing, current: current, input: input, now: now)
         if !found.forYou.isEmpty {
             shelves.append(LiveShelf(id: "foryou", title: String(localized: "For You"),
                                      items: onNow(Array(found.forYou.prefix(20)), section: "foryou")))
@@ -283,6 +285,7 @@ enum LiveShelves {
         if !favourites.isEmpty {
             shelves.append(LiveShelf(id: "favorites", title: String(localized: "Favorites"), items: favourites))
         }
+        if favoritesOnly { return shelves.filter { $0.id == "favorites" } }
 
         if !airing.isEmpty {
             shelves.append(LiveShelf(id: "now", title: String(localized: "On Now"), items: onNow(Array(airing.prefix(150)), section: "now")))

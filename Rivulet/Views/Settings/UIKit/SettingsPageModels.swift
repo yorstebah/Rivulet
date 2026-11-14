@@ -245,6 +245,7 @@ enum SettingsContent {
         case .autoplayCountdownPicker: return autoplayCountdownPicker
         case .skipIntervalPicker:     return skipIntervalPicker
         case .skipBackIntervalPicker: return skipBackIntervalPicker
+        case .heightSpeakersPicker:   return heightSpeakersPicker
         case .subtitleModePicker:     return subtitleModePicker
         case .autoplayLimitPicker:    return autoplayLimitPicker
         case .homeQualityPicker:      return qualityPicker(home: true)
@@ -381,6 +382,21 @@ enum SettingsContent {
                 isSelected: { AutoplayLimit.current == opt },
                 select: { SettingsStore.setInt(AutoplayLimit.storageKey, opt.rawValue) }))
         }
+    }
+
+    /// "" is Off; the rest are the layouts the engine renders heights into.
+    private static var heightSpeakersPicker: [SettingsRowItem] {
+        ["", "5.1.2", "5.1.4", "7.1.2", "7.1.4", "9.1.6"].map { layout in
+            SettingsRowItem(id: "hs_\(layout.isEmpty ? "off" : layout)", verbatim: layout.isEmpty ? String(localized: "Off") : layout,
+                            kind: .selectable(isSelected: { heightSpeakers == layout }, value: { nil }, handler: { vc in
+                SettingsStore.setString(AetherPlayer.heightSpeakersKey, layout)
+                (vc as? SettingsPageViewController)?.onPop?()
+            }))
+        }
+    }
+
+    private static var heightSpeakers: String {
+        SettingsStore.string(AetherPlayer.heightSpeakersKey, default: "")
     }
 
     /// Read at play time by the player (`StreamingQuality.setting`).
@@ -672,12 +688,26 @@ enum SettingsContent {
                                          })),
             .header("Home Theater"),
             toggle("upscaleLowResolution", "Upscale SD and 720p", key: AetherPlayer.upscaleKey, default: false),
+        ] + selfBuiltHomeTheaterRows + [
             .header("Filtering"),
             SettingsRowItem(id: "cat_contentFilter", title: "Content Filtering",
                             kind: .navigationValue(.contentFilter, value: {
                                 SettingsStore.bool(ContentFilterManager.Keys.enabled, default: false) ? String(localized: "On") : String(localized: "Off")
                             })),
         ]
+    }
+
+    /// Rows for the self-built options (#609, Scripts/enthusiast-build.py); none in the App Store build.
+    private static var selfBuiltHomeTheaterRows: [SettingsRowItem] {
+        var rows: [SettingsRowItem] = []
+        if AetherPlayer.buildsFEL {
+            rows.append(toggle("dolbyVisionFEL", "Dolby Vision FEL", key: AetherPlayer.dolbyVisionFELKey, default: true))
+        }
+        if AetherPlayer.buildsHeightAudio {
+            rows.append(SettingsRowItem(id: "heightSpeakers", title: "Height Speakers",
+                                        kind: .navigationValue(.heightSpeakersPicker, value: { heightSpeakers.isEmpty ? String(localized: "Off") : heightSpeakers })))
+        }
+        return rows
     }
 
     private static var generatedSubtitlesValue: String {
@@ -1206,6 +1236,7 @@ enum SettingsContent {
         var on: [SettingsRowItem] = []
         var off: [SettingsRowItem] = []
         var listedFavorites: Set<MediaLibrary.LibraryKind> = []
+        var listedChannels = false
         var listedPlaylists: Set<String> = []
         func add(_ item: SettingsRowItem, isOn: Bool) {
             if isOn { on.append(item) } else { off.append(item) }
@@ -1229,6 +1260,9 @@ enum SettingsContent {
             }) {
                 listedFavorites.insert(favoriteKind)
                 add(favoritesRow(favoriteKind, onReorder: isOn ? move(key) : nil), isOn: isOn)
+            } else if key == FavoriteChannelsRow.identifier {
+                listedChannels = true
+                add(favoriteChannelsRow(onReorder: isOn ? move(key) : nil), isOn: isOn)
             } else if row.id.hasPrefix(PersonalRows.playlistRowPrefix) {
                 // A playlist just switched off can outlive its pin for a moment:
                 // it is listed with the others under "Hidden from Home".
@@ -1260,6 +1294,9 @@ enum SettingsContent {
         where PersonalHomeRows.offersFavorites && !listedFavorites.contains(kind) {
             add(favoritesRow(kind, onReorder: nil), isOn: PersonalRows.showsFavorites(kind))
         }
+        if LiveTVDataStore.shared.offersHomeFavorites && !listedChannels {
+            add(favoriteChannelsRow(onReorder: nil), isOn: FavoriteChannelsRow.isShown)
+        }
         for entry in homePlaylists() where !listedPlaylists.contains("\(entry.providerID)/\(entry.playlistID)") {
             add(playlistToggle(providerID: entry.providerID, playlistID: entry.playlistID,
                                title: entry.title, label: serverLabeled(entry.title, providerID: entry.providerID), onReorder: nil),
@@ -1274,6 +1311,7 @@ enum SettingsContent {
                 HomeRowSettings.showAll()
                 HomeRowOrder.reset()
                 PersonalRows.favoriteKinds.forEach { PersonalRows.setShowsFavorites(false, $0) }
+                FavoriteChannelsRow.setShown(false)
                 HomePlaylistPins.removeAll()
                 (vc as? SettingsPageViewController)?.reloadRows()
             }
@@ -1301,6 +1339,7 @@ enum SettingsContent {
         if let kind = PersonalRows.favoriteKinds.first(where: { PersonalRows.favoritesIdentifier($0) == row.hubIdentifier }) {
             return PersonalRows.showsFavorites(kind)
         }
+        if row.hubIdentifier == FavoriteChannelsRow.identifier { return FavoriteChannelsRow.isShown }
         if row.id.hasPrefix(PersonalRows.playlistRowPrefix) {
             return HomePlaylistPins.pins.contains {
                 PersonalRows.playlistRowID(providerID: $0.providerID, playlistID: $0.playlistID) == row.id
@@ -1321,6 +1360,17 @@ enum SettingsContent {
             set: { shown in
                 if shown { HomeRowOrder.placeLast(PersonalRows.favoritesIdentifier(kind), among: shownHomeRowKeys()) }
                 PersonalRows.setShowsFavorites(shown, kind)
+            },
+            didChange: reloadPage),
+            onReorder: onReorder, reorderGroup: onReorder == nil ? nil : "homeRows")
+    }
+
+    private static func favoriteChannelsRow(onReorder: ((Bool) -> Void)?) -> SettingsRowItem {
+        SettingsRowItem(id: "homeFavoriteChannels", title: "Favorite Channels", kind: .toggle(
+            get: { FavoriteChannelsRow.isShown },
+            set: { shown in
+                if shown { HomeRowOrder.placeLast(FavoriteChannelsRow.identifier, among: shownHomeRowKeys()) }
+                FavoriteChannelsRow.setShown(shown)
             },
             didChange: reloadPage),
             onReorder: onReorder, reorderGroup: onReorder == nil ? nil : "homeRows")
