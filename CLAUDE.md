@@ -969,7 +969,7 @@ owner steps (developer portal, CloudKit schema deploy, profiles) are in
   it is unencrypted on disk, and a key that can embed access (a list source URL) stays out.
 - **Credentials ride one CloudKit record, encrypted with `encryptedValues`.**
   `AccountVault` holds the record, `AccountSyncCoordinator` runs a cycle, and the
-  kinds (`SyncedAccountKind`: Plex, Live TV, Jellyfin, Emby) live in RivuletCore beside
+  kinds (`SyncedAccountKind`: Plex, Live TV, Jellyfin, Emby, the TMDB key) live in RivuletCore beside
   their sessions. A new account type is one kind registered in `CloudSync.accountKinds`,
   not a per-app hook. Adoption verifies the token with one authenticated call first.
 - **Sign-out asks "this device only" or "all devices" when the account is shared**
