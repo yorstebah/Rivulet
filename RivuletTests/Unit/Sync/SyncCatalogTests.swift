@@ -59,7 +59,7 @@ final class SyncCatalogTests: XCTestCase {
             "homeStreamingQuality", "awayStreamingQuality", "upscaleLowResolution", "audioSyncOffsetMs",
             "subtitleDelayByMedia", "subtitleHeightUnits", "downloadQuality", "iosShowPlaylists",
             "recentSearchItems", "iosRecentSearches", "lastSeenBuild", "setupComplete",
-            "liveTVRecentChannelIds", "liveTVViewings", "liveTVEventSlotChannelIds",
+            "liveTVRecentChannelIds", "liveTVEventSlotChannelIds",
             // The switch itself and its bookkeeping.
             SyncCatalog.enabledKey, SyncCatalog.stateKey, SyncCatalog.accountStateKey, SyncCatalog.accountPrintKey, SyncCatalog.heldKey,
         ]

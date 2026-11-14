@@ -137,6 +137,10 @@ struct RivuletApp: App {
             if touched(["homeCollectionPins", "libraryCollectionPins"]) {
                 NotificationCenter.default.post(name: HomeCollectionPins.changedNotification, object: nil)
             }
+            // Xtream progress or favorites from another device: progress bars, Continue Watching, For You.
+            if touched([XtreamWatchProgressStore.defaultsKey, XtreamWatchProgressStore.favoritesKey]) {
+                NotificationCenter.default.post(name: .plexDataNeedsRefresh, object: nil)
+            }
         }
         // The Live TV store re-keys old URL-named M3U favorites when it starts. That must finish before the
         // first sync pass, or a playlist URL with its login could be uploaded as a channel id.

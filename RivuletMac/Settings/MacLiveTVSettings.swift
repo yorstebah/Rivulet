@@ -56,7 +56,7 @@ struct MacLiveTVSettingsView: View {
             Section {
                 Toggle("Suggestions", isOn: $suggestions)
             } footer: {
-                Text("For You picks channels from what you watch. It learns on this Mac only.")
+                Text("For You picks channels from what you watch. With iCloud sync on, it learns across your devices.")
             }
         }
         .formStyle(.grouped)
@@ -223,10 +223,7 @@ private struct MacXtreamVODSection: View {
         .onDisappear(perform: saveKey)
     }
 
-    private func saveKey() {
-        let trimmed = tmdbKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { _ = KeychainHelper.delete(TMDBLookup.keychainKey) } else { _ = KeychainHelper.set(trimmed, forKey: TMDBLookup.keychainKey) }
-    }
+    private func saveKey() { TMDBKeyStore.set(tmdbKey) }
 }
 
 /// Rivulet's favorites in order: drag to reorder, Delete to remove.

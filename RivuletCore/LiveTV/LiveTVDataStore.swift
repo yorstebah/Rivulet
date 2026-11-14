@@ -1672,6 +1672,10 @@ class LiveTVDataStore: ObservableObject {
     /// iCloud changed these keys under us: reread what is cached.
     func syncedPreferencesChanged(_ keys: Set<String>) {
         if keys.contains(favoritesKey) || keys.contains(unfavoritedKey) { loadFavorites() }
+        if keys.contains(viewingsKey) {
+            viewings = userDefaults.data(forKey: viewingsKey)
+                .flatMap { try? JSONDecoder().decode([LiveViewing].self, from: $0) } ?? []
+        }
         if keys.contains(Self.hiddenPlexServersKey) { plexContentTokenChanged() }
     }
 

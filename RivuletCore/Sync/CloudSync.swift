@@ -16,7 +16,7 @@ final class CloudSync: ObservableObject {
     /// Set by the host at launch, before `start()`: stores that cache a synced key reload here.
     static var onPreferencesApplied: ((Set<String>) -> Void)?
     /// Every account type the vault carries; both apps sign all of them in.
-    static var accountKinds: [SyncedAccountKind] { [.plex, .liveTV, .jellyfin, .emby] }
+    static var accountKinds: [SyncedAccountKind] { [.plex, .liveTV, .jellyfin, .emby, .tmdb] }
     /// Accounts or sources were signed in or out here because another device changed them.
     static var onAccountsChanged: (() -> Void)?
 
@@ -159,6 +159,10 @@ final class CloudSync: ObservableObject {
         LiveTVDataStore.shared.syncedPreferencesChanged(applied)
         if applied.contains(SyncCatalog.channelListsKey) || applied.contains(LiveChannelListStore.pinsKey) {
             LiveChannelListStore.shared.reload()
+        }
+        if applied.contains(XtreamWatchProgressStore.defaultsKey) || applied.contains(XtreamWatchProgressStore.favoritesKey) {
+            // Each app's `onPreferencesApplied` repaints, as after any watch-state change.
+            XtreamWatchProgressStore.shared.reload()
         }
         PlexExtraServers.shared.syncedPreferencesChanged(applied)
         if applied.contains(JellyfinLiveTVProvider.hiddenKey) {

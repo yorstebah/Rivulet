@@ -439,7 +439,9 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let seeds = XtreamForYou.seeds(state, source: id, library: kind, now: now)
         guard !seeds.isEmpty else { return nil }
         let hasKey = await tmdb.hasKey()
-        let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(state.records.count)"
+        // The newest place too: a synced device can change records without changing their count.
+        let newest = state.records.values.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0
+        let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(state.records.count)|\(newest)"
         let cached = forYouCache.withLock { $0[library.id] }
         let ids: [String]
         if let cached, cached.key == cacheKey, now.timeIntervalSince(cached.at) < 6 * 3600 {

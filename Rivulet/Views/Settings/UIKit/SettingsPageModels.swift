@@ -1504,14 +1504,7 @@ enum SettingsContent {
                 suggestions: [],
                 keyboardType: .asciiCapable,
                 isSecure: true,
-                set: { key in
-                    let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if trimmed.isEmpty {
-                        _ = KeychainHelper.delete(TMDBLookup.keychainKey)
-                    } else {
-                        _ = KeychainHelper.set(trimmed, forKey: TMDBLookup.keychainKey)
-                    }
-                })))
+                set: { TMDBKeyStore.set($0) })))
         }
         // Only shown when a profile is actually set, so the common all-channels
         // source keeps the page as short as it is today.

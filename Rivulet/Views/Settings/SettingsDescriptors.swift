@@ -291,7 +291,7 @@ enum SettingsDescriptorStore {
         ),
         "liveTVSuggestions": SettingDescriptor(
             icon: "sparkles",
-            description: "Adds a For You row to What's On, with channels picked from what you watch. It learns on this Apple TV only."
+            description: "Adds For You to What's On and the List, with channels picked from what you watch. With iCloud sync on, it learns across your devices."
         ),
         "keepPlayingInGuide": SettingDescriptor(
             icon: "pip",

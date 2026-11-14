@@ -25,12 +25,15 @@ nonisolated enum SyncCatalog {
         SkipLengthKeys.forward, SkipLengthKeys.back,
         // Content filter (not its list source URL, which can embed access)
         "contentFilter.enabled", "contentFilter.profanityStrength", "contentFilter.customWords",
-        // Live TV (not recents, viewings or event slots: device habit)
+        // Live TV (not recents or event slots: device habit). Viewings are what For You learns
+        // from, so it suggests the same on every device.
         "liveTVLayout", "liveTVKeepPlayingInGuide", "combineLiveTVSources", "confirmExitMultiview",
         "liveTVSuggestions", "liveTVFavoriteChannelIds", "liveTVUnfavoritedChannelIds",
         "liveTVHiddenPlexServers", "liveTVHideJellyfin", "liveTVHideEmby",
         // The viewer's own and smart channel lists, and pinned categories
-        channelListsKey, "liveTVPinnedCategories",
+        channelListsKey, "liveTVPinnedCategories", viewingsKey,
+        // Xtream films and series: where the viewer is, and their favorites (the panel keeps neither)
+        watchProgressKey, "xtreamFavorites",
         // Servers the user turned off, by machine id
         "plexDisabledServers",
         // Photos
@@ -77,6 +80,13 @@ nonisolated enum SyncCatalog {
     /// `LiveChannelListStore.listsKey`: JSON lists whose channel ids and smart-list source ids
     /// follow the channel-id rule, list by list.
     static let channelListsKey = "liveTVChannelLists"
+    /// `LiveTVDataStore`'s For You history: merged by channel and time, the newest kept.
+    static let viewingsKey = "liveTVViewings"
+    /// `XtreamWatchProgressStore.defaultsKey`: merged by title, the newest place wins.
+    static let watchProgressKey = "xtreamWatchProgress"
+    /// What iCloud carries of each, under the 64 KB a value may take.
+    static let syncedViewings = 200
+    static let syncedWatchRecords = 400
 
     /// A channel id is "<type>:<source id>:<channel>". Plex and Dispatcharr source ids hold the server address
     /// (which differs per device), and an M3U id from before the re-key held the whole playlist URL, login included.
@@ -90,6 +100,8 @@ nonisolated enum SyncCatalog {
     /// The local value as the cloud may see it.
     static func outgoing(_ key: String, _ value: Any) -> Any {
         if key == channelListsKey { return lists(value).map { encode($0.map { shared($0) }) } ?? value }
+        if key == viewingsKey { return viewings(value).map { encode(Array($0.filter(isSharedViewing).suffix(syncedViewings))) } ?? value }
+        if key == watchProgressKey { return records(value).map { encode(newest($0, syncedWatchRecords)) } ?? value }
         guard channelListKeys.contains(key), let ids = value as? [String] else { return value }
         return ids.filter(isSyncableChannelId)
     }
@@ -97,6 +109,8 @@ nonisolated enum SyncCatalog {
     /// What this device keeps after taking the cloud's value: the cloud's ids, then the local ones that stay home.
     static func incoming(_ key: String, cloud: Any?, local: Any?) -> Any? {
         if key == channelListsKey { return incomingLists(cloud: cloud, local: local) }
+        if key == viewingsKey { return incomingViewings(cloud: cloud, local: local) }
+        if key == watchProgressKey { return incomingRecords(cloud: cloud, local: local) }
         guard channelListKeys.contains(key) else { return cloud }
         let shared = (cloud as? [String] ?? []).filter(isSyncableChannelId)
         let home = (local as? [String] ?? []).filter { !isSyncableChannelId($0) }
@@ -146,6 +160,54 @@ nonisolated enum SyncCatalog {
     /// Sorted keys: the same lists always make the same bytes, so the mirror sees no false change.
     private static func encode(_ lists: [[String: Any]]) -> Any {
         (try? JSONSerialization.data(withJSONObject: lists, options: [.sortedKeys])) ?? Data()
+    }
+
+    // MARK: For You history and Xtream watch progress
+
+    /// Both devices' viewings, one per channel and moment, oldest first, as the store keeps 300.
+    private static func incomingViewings(cloud: Any?, local: Any?) -> Any? {
+        guard let theirs = viewings(cloud as Any) else { return cloud }
+        var seen = Set<String>()
+        let merged = (theirs + (viewings(local as Any) ?? []))
+            .filter { seen.insert("\($0["channelId"] as? String ?? "")|\(time($0["at"]))").inserted }
+            .sorted { time($0["at"]) < time($1["at"]) }
+        return encode(Array(merged.suffix(300)))
+    }
+
+    /// Every title either device has a place for, the newer place where both do.
+    private static func incomingRecords(cloud: Any?, local: Any?) -> Any? {
+        guard let theirs = records(cloud as Any) else { return cloud }
+        var merged = records(local as Any) ?? [:]
+        for (key, record) in theirs where time(record["updatedAt"]) >= time(merged[key]?["updatedAt"]) {
+            merged[key] = record
+        }
+        // A dictionary, as the store saves it; JSONSerialization writes it as an object.
+        return (try? JSONSerialization.data(withJSONObject: merged, options: [.sortedKeys])) ?? Data()
+    }
+
+    /// A viewing of a channel whose id may leave the device (`isSyncableChannelId`).
+    private static func isSharedViewing(_ viewing: [String: Any]) -> Bool {
+        (viewing["channelId"] as? String).map(isSyncableChannelId) ?? false
+    }
+
+    /// The `count` titles touched last.
+    private static func newest(_ records: [String: [String: Any]], _ count: Int) -> [String: Any] {
+        let kept = records.sorted { time($0.value["updatedAt"]) > time($1.value["updatedAt"]) }.prefix(count)
+        return Dictionary(kept.map { ($0.key, $0.value as Any) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    private static func viewings(_ value: Any) -> [[String: Any]]? { lists(value) }
+
+    private static func records(_ value: Any) -> [String: [String: Any]]? {
+        guard let data = value as? Data else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: [String: Any]]
+    }
+
+    /// A JSONEncoder date (seconds since 2001), or the earliest when missing.
+    private static func time(_ value: Any?) -> Double { (value as? NSNumber)?.doubleValue ?? -.infinity }
+
+    private static func encode(_ object: [String: Any]) -> Any {
+        (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
     }
 
     /// NSUbiquitousKeyValueStore raises on a key over 128 UTF-16 units.

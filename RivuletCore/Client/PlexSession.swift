@@ -63,7 +63,13 @@ final class PlexSession: ObservableObject {
         // Jellyfin and Emby sign in and out through the registry; follow it.
         secondaryIDs = MediaProviderRegistry.shared.secondaryProviders.map(\.id)
         MediaProviderRegistry.shared.onSecondaryProvidersChanged = { [weak self] providers in
-            // The servers' Live TV follows every sign-in, sign-out and profile change (shared with tvOS).
+            // Xtream progress or favorites from another device: repaint as after a watch-state change.
+        CloudSync.onPreferencesApplied = { [weak self] keys in
+            guard keys.contains(XtreamWatchProgressStore.defaultsKey)
+                    || keys.contains(XtreamWatchProgressStore.favoritesKey) else { return }
+            Task { await self?.watchStateDidChange() }
+        }
+        // The servers' Live TV follows every sign-in, sign-out and profile change (shared with tvOS).
             OtherServerKind.configureLiveTV(secondary: providers, restricted: PlexUserProfileManager.shared.isRestrictedProfile)
             guard let self else { return }
             let ids = providers.map(\.id)

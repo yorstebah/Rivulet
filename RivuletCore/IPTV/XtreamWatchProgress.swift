@@ -37,11 +37,16 @@ final class XtreamWatchProgressStore: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        if let data = defaults.data(forKey: Self.defaultsKey),
-           let saved = try? JSONDecoder().decode([String: XtreamWatchRecord].self, from: data) {
-            records = saved
-        }
-        favorites = defaults.stringArray(forKey: Self.favoritesKey) ?? []
+        reload()
+    }
+
+    /// Rereads both, as iCloud sync does after changing them.
+    func reload() {
+        let saved = defaults.data(forKey: Self.defaultsKey)
+            .flatMap { try? JSONDecoder().decode([String: XtreamWatchRecord].self, from: $0) } ?? [:]
+        if saved != records { records = saved }
+        let favorites = defaults.stringArray(forKey: Self.favoritesKey) ?? []
+        if favorites != self.favorites { self.favorites = favorites }
     }
 
     enum Kind: String, Sendable { case movie, episode, series }
