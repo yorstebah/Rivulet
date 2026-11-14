@@ -250,9 +250,10 @@ struct GuideLayoutView: View {
                 // No custom base: when the focused programme has no artwork the
                 // stock system background (the same one Settings uses) shows
                 // through. When artwork exists, `ambiance` paints it on top.
-                // Over the player the picture is the backdrop, dimmed to read the grid on.
+                // Over the player the player draws the backdrop (`LiveGuideOverlay.backdrop`):
+                // the picture darkened under the title and a glass sheet under the grid.
                 if overPlayer {
-                    Color.black.opacity(0.45).ignoresSafeArea()
+                    Color.clear
                 } else {
                     ambiance
                 }

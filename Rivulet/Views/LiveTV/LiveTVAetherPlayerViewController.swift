@@ -219,6 +219,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     /// This channel's picture is up: until then the reused player still holds the last
     /// channel's tracks, which must not be noted as this one's quality.
     private var hasPresentedThisChannel = false
+    /// The darkening and glass sheet under the guide over the picture.
+    private var guideBackdrop: UIView?
     /// The viewer paused this channel since it started, so a jump on resume needs a word.
     private var pausedSinceJoin = false
     /// The guide over the playing channel (Right), while it is open.
@@ -942,8 +944,11 @@ final class LiveTVAetherPlayerViewController: UIViewController {
             scrubberProxy.bottomAnchor.constraint(equalTo: progressBar.topAnchor, constant: 56),
         ])
         railView.scrubberFocusProxy = scrubberProxy
-        scrubberProxy.onSkip = { [weak self] forward in self?.timelineArrow(forward: forward) }
-        scrubberProxy.onShuttle = scrubberProxy.onSkip
+        // A tap on the timeline: Right opens the guide, as from the picture, and Left does
+        // nothing (the viewer's choice: only the rail's skip button skips). While paused in
+        // the rewind window a tap still steps the scrub. Holding still shuttles.
+        scrubberProxy.onSkip = { [weak self] forward in self?.timelineTap(forward: forward) }
+        scrubberProxy.onShuttle = { [weak self] forward in self?.timelineArrow(forward: forward) }
         scrubberProxy.onSelect = { [weak self] in self?.timelineSelected() }
         timelinePan.isEnabled = { [weak self] in
             guard let self, self.scrubberProxy.isFocused, self.activePanel == nil,
@@ -1950,12 +1955,18 @@ final class LiveTVAetherPlayerViewController: UIViewController {
             },
             onClose: { [weak self] in self?.closeGuideOverlay() })
         guideOverlay = guide
+        let backdrop = LiveGuideOverlay.backdrop()
+        backdrop.frame = view.bounds
+        backdrop.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(backdrop)
+        guideBackdrop = backdrop
         guide.view.frame = view.bounds
         guide.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         addChild(guide)
         view.addSubview(guide.view)
         guide.didMove(toParent: self)
         guide.view.layoutIfNeeded()
+        syncSubtitleOverlay()
         handFocusToGuide(guide, attempt: 0)
     }
 
@@ -1991,6 +2002,9 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         guide.willMove(toParent: nil)
         guide.view.removeFromSuperview()
         guide.removeFromParent()
+        guideBackdrop?.removeFromSuperview()
+        guideBackdrop = nil
+        syncSubtitleOverlay()
         focusCatcher.isHidden = false
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
@@ -2561,6 +2575,14 @@ final class LiveTVAetherPlayerViewController: UIViewController {
 
     /// Left/Right on the timeline. A held drag moves by a step, as VOD's skip
     /// does mid-scrub; a click just after a swipe is the swipe's own end.
+    private func timelineTap(forward: Bool) {
+        if scrubTarget != nil || touchScrubPending {
+            timelineArrow(forward: forward)
+        } else if forward {
+            presentGuideOverlay()
+        }
+    }
+
     private func timelineArrow(forward: Bool) {
         guard !touchScrubActive else { return }
         if let ended = touchScrubEndedAt, Date().timeIntervalSince(ended) < 0.5 { return }
@@ -2849,6 +2871,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
             if animated { UIView.animate(withDuration: 0.25) { overlay.layoutIfNeeded() } }
         }
         overlay.setControlsVisible(railVisible || timelineVisible, animated: animated)
+        // The guide over the picture is read, not watched: captions would sit on its rows.
+        overlay.isHidden = guideOverlay != nil
     }
 
     /// Shows subtitles while tvOS's Show When Muted applies, then puts the prior
