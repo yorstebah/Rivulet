@@ -150,6 +150,9 @@ enum XtreamForYou {
         }
     }
 
+    /// How much the viewer's Trakt recommendations count, against a seed's weight for TMDB's.
+    static let traktWeight: Double = 2
+
     /// Recommendations after each seed, ranked by how many seeds lead to a title, weighted by
     /// the seed and the place in its list; kept to the panel's titles the viewer has not seen.
     static func tmdbPicks(_ lists: [(seedWeight: Double, recommendations: [TMDBRecommendation])],

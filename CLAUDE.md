@@ -635,6 +635,21 @@ Two layouts: What's On (`LiveBrowseViewController`, the default) and the Guide (
 **Xtream films and series** are a media server, not Live TV: each Xtream source is also an `XtreamVODProvider` (`RivuletCore/MediaProvider/Xtream/`, kind `.xtream`, id = the Live TV source id) behind the same `MediaProvider` seam, so Home, libraries (Movies, TV Shows; provider categories are Collections), Search, detail and the player come for free on all three apps. On by default, switchable per source (`XtreamVODSources`); registered at launch by `XtreamVODWiring.install` (skipped in the unit-test host). The lists (`get_vod_streams`, `get_series`, tens of thousands of titles, no paging) are kept on disk for a day by `XtreamVODCatalog`, and every sort, page and search reads that copy; `get_vod_info` / `get_series_info` only when a page opens. Watch progress and favorites live on the device (`XtreamWatchProgressStore`): the panel has no such API. Titles lose the panel's tags (`XtreamService.splitTags`), and a language tag becomes the poster's edition badge (`ContentOrigin`). With the viewer's own TMDB key (Keychain, `TMDBLookup`) detail pages take TMDB's plot, genres and cast; the maintainer's relay is not used for this. Stream URLs embed the login: never send one to Sentry or a log.
 iOS reads the same `LiveTVDataStore` and saved sources and adds sources through the same `LiveTVSourceConnector`. Dispatcharr API keys and M3U playlist/guide URLs (which often embed credentials) live in the Keychain (`liveTVSourceToken_`, `liveTVSourceM3U_`, `liveTVSourceEPG_` + source id); the saved source JSON keeps one only if the Keychain write fails. An M3U source id is a hash of its URL (`m3uSourceId`), never the URL itself; older URL-keyed sources are re-keyed on launch with their saved channel ids renamed.
 
+### Skip markers and Trakt
+
+- **Skip markers**: the server's own win; then, with the "useIntroDB" opt-in, introdb.app (show IMDb id)
+  and TheIntroDB.org (`api.theintrodb.org/v2/media`, TMDB, TVDB or IMDb id; no key, 30 requests per 10 s)
+  fill the kinds it lacks (`CommunityMarkers`). Plex and Xtream fill their own; Jellyfin and Emby go
+  through `CommunityMarkers.extras` from their show's external ids. A lookup is held to 6 s: iPhone and
+  Mac wait for markers before playing.
+- **Trakt** (`RivuletCore/Trakt/`) shows only when `Secrets.traktClientID`/`traktClientSecret` are set.
+  Device-code sign-in; tokens in the Keychain and the account vault (Trakt rotates the refresh token on
+  every refresh, so a refreshed pair goes back to the vault, and a vault entry is only tried, never
+  refreshed). Every player's `PlaybackTimeline` report also goes to `TraktScrobbler`, which sends only
+  changes: playing starts, paused or stopped stops (Trakt counts 80% and up as watched; there is no
+  pause call). A switch per server kind (`TraktScrobbleSettings`), as a server plugin may already scrobble.
+  Recommendations feed Xtream's For You.
+
 ### Content Filter (VOD)
 
 A local VidAngel/ClearPlay-style filter: mute language, skip scenes, never touch the
@@ -969,7 +984,7 @@ owner steps (developer portal, CloudKit schema deploy, profiles) are in
   it is unencrypted on disk, and a key that can embed access (a list source URL) stays out.
 - **Credentials ride one CloudKit record, encrypted with `encryptedValues`.**
   `AccountVault` holds the record, `AccountSyncCoordinator` runs a cycle, and the
-  kinds (`SyncedAccountKind`: Plex, Live TV, Jellyfin, Emby, the TMDB key) live in RivuletCore beside
+  kinds (`SyncedAccountKind`: Plex, Live TV, Jellyfin, Emby, the TMDB key, Trakt) live in RivuletCore beside
   their sessions. A new account type is one kind registered in `CloudSync.accountKinds`,
   not a per-app hook. Adoption verifies the token with one authenticated call first.
 - **Sign-out asks "this device only" or "all devices" when the account is shared**

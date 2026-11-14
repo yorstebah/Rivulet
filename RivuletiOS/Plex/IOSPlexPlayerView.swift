@@ -41,6 +41,7 @@ final class IOSPlexPlayback: ObservableObject, IOSPlaybackSession {
             let request = request, plex = plex
             let position = reportPosition.resolve(time, isLoading: player.state == .loading,
                                                   isStarting: player.isStarting, hasStarted: playbackStart.streamHasPlayed)
+            TraktScrobbler.shared.report(request, state: state, at: position)
             return { await plex.reportProgress(for: request, time: position, state: state.rawValue) }
         }
         timeline.onTerminated = { [weak self] in self?.endForServerTermination($0) }

@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ (List)" : {},
+    "Code" : {},
+    "Connect to Trakt" : {},
+    "Couldn’t reach Trakt. Check your connection and try again." : {},
+    "Open Trakt" : {},
+    "Rivulet tells Trakt what you start, pause and finish, and adds Trakt’s picks to For You in Xtream films and series. Your Trakt sign-in is shared with your other devices through iCloud Sync." : {},
+    "Send What You Watch" : {},
+    "Sign Out of Trakt?" : {},
+    "The code expired. Try again." : {},
+    "The code was not accepted. Try again." : {},
+    "Turn a server off if it already reports to Trakt itself, or every play counts twice. Xtream series need a TMDB key to be recognised." : {},
     "Add to List" : {},
     "Africa" : {},
     "All Languages" : {},

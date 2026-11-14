@@ -1,6 +1,25 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Connect to Trakt" : {},
+    "Connected to Trakt" : {},
+    "Connecting to Trakt…" : {},
+    "Couldn’t Connect" : {},
+    "Couldn’t reach Trakt. Check your connection and try again." : {},
+    "Send What You Watch" : {},
+    "Sends the Xtream films and series you watch to Trakt. Series need a TMDB key to be recognised." : {},
+    "Sends what you watch on Emby to Trakt. Turn this off if your server has the Trakt plugin, or every play counts twice." : {},
+    "Sends what you watch on Jellyfin to Trakt. Turn this off if your server has the Trakt plugin, or every play counts twice." : {},
+    "Sends what you watch on Plex to Trakt. Turn this off if your Plex server already reports to Trakt, or every play counts twice." : {},
+    "Shows a code to enter on your phone or computer. Rivulet then tells Trakt what you start, pause and finish. Your Trakt sign-in is shared with your other devices through iCloud Sync." : {},
+    "Sign Out of Trakt?" : {},
+    "Stops sending what you watch to Trakt." : {},
+    "Tells Trakt what you watch, from every server, and adds Trakt’s picks to For You in Xtream films and series." : {},
+    "The code expired. Try again." : {},
+    "The code was not accepted. Try again." : {},
+    "The Trakt account what you watch is sent to." : {},
+    "What you watch here stops reaching Trakt." : {},
+    "Your Trakt sign-in is shared through iCloud. Sign out of this device only, or of every device?" : {},
     "%@" : {
       "localizations" : {
         "de" : {

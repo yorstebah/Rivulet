@@ -36,6 +36,8 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     private let communityMarkers: CommunityMarkers.Lookup
     /// The "Community Marker Database" opt-in, read at each episode.
     private let usesCommunityMarkers: @Sendable () -> Bool
+    /// The viewer's Trakt recommendations, empty when not signed in; tests pass their own.
+    private let traktPicks: @Sendable (TraktClient.Kind) async -> [TraktTitle]
 
     /// `sourceID` is the Live TV source's ("xtream:<hash>"), which is also a valid provider id.
     init(sourceID: String, displayName: String, account: XtreamAccount,
@@ -43,7 +45,11 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
          tmdb: TMDBLookup? = nil,
          watchStore: @escaping @MainActor @Sendable () -> XtreamWatchProgressStore = { .shared },
          communityMarkers: @escaping CommunityMarkers.Lookup = CommunityMarkers.live,
-         usesCommunityMarkers: @escaping @Sendable () -> Bool = { CommunityMarkers.isEnabled }) {
+         usesCommunityMarkers: @escaping @Sendable () -> Bool = { CommunityMarkers.isEnabled },
+         traktPicks: @escaping @Sendable (TraktClient.Kind) async -> [TraktTitle] = { kind in
+             guard await MainActor.run(body: { TraktConfig.isConfigured && TraktAccount.shared.isSignedIn }) else { return [] }
+             return await TraktClient.shared.recommendations(kind)
+         }) {
         self.id = sourceID
         self.displayName = displayName
         let service = XtreamService(account: account, session: session)
@@ -53,6 +59,7 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         self.tmdb = tmdb ?? .shared
         self.communityMarkers = communityMarkers
         self.usesCommunityMarkers = usesCommunityMarkers
+        self.traktPicks = traktPicks
     }
 
     // MARK: - Watch state
@@ -550,9 +557,10 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let seeds = XtreamForYou.seeds(state, source: id, library: kind, now: now)
         guard !seeds.isEmpty else { return nil }
         let hasKey = await tmdb.hasKey()
+        let hasTrakt = await MainActor.run { TraktConfig.isConfigured && TraktAccount.shared.isSignedIn }
         // The newest place too: a synced device can change records without changing their count.
         let newest = state.records.values.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0
-        let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(state.records.count)|\(newest)|"
+        let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(hasTrakt)|\(state.records.count)|\(newest)|"
             + languages.origins.joined(separator: ",")
         let cached = forYouCache.withLock { $0[library.id] }
         var ids = cached?.ids
@@ -634,8 +642,16 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         var tmdbPicks: [String] = []
         var languages = Set<String>()
         let tmdbKind: TMDBLookup.Kind = kind == .movies ? .movie : .tv
+        var lists: [(seedWeight: Double, recommendations: [TMDBRecommendation])] = []
+        // Trakt's picks are the viewer's own, from everything they watch anywhere: weighted above
+        // one title's TMDB neighbours, and used with or without a TMDB key.
+        let trakt = await traktPicks(kind == .movies ? .movies : .shows)
+        if !trakt.isEmpty {
+            lists.append((XtreamForYou.traktWeight, trakt.map {
+                TMDBRecommendation(id: $0.tmdb ?? 0, title: $0.title, originalTitle: nil, year: $0.year)
+            }))
+        }
         if useTMDB {
-            var lists: [(seedWeight: Double, recommendations: [TMDBRecommendation])] = []
             for seed in seeds.prefix(XtreamForYou.tmdbSeedLimit) {
                 guard let title = byID[seed.id] else { continue }
                 // The language the viewer watches it in is the title's own, whatever the panel's tag.
@@ -651,6 +667,8 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
                 guard let tmdbID else { continue }
                 lists.append((seed.weight, await tmdb.recommendations(tmdbKind, tmdbID: tmdbID)))
             }
+        }
+        if !lists.isEmpty {
             tmdbPicks = XtreamForYou.tmdbPicks(lists, index: XtreamForYou.Index(candidates), seen: seen,
                                                languages: languages)
         }

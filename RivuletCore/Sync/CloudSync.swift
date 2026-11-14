@@ -16,7 +16,7 @@ final class CloudSync: ObservableObject {
     /// Set by the host at launch, before `start()`: stores that cache a synced key reload here.
     static var onPreferencesApplied: ((Set<String>) -> Void)?
     /// Every account type the vault carries; both apps sign all of them in.
-    static var accountKinds: [SyncedAccountKind] { [.plex, .liveTV, .jellyfin, .emby, .tmdb] }
+    static var accountKinds: [SyncedAccountKind] { [.plex, .liveTV, .jellyfin, .emby, .tmdb, .trakt] }
     /// Accounts or sources were signed in or out here because another device changed them.
     static var onAccountsChanged: (() -> Void)?
 

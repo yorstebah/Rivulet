@@ -87,6 +87,38 @@ enum SettingsDescriptorStore {
             icon: "server.rack",
             description: "Manage your Plex, Jellyfin and Emby server connections and user profiles."
         ),
+        "cat_trakt": SettingDescriptor(
+            icon: "checkmark.circle",
+            description: "Tells Trakt what you watch, from every server, and adds Trakt’s picks to For You in Xtream films and series."
+        ),
+        "connectTrakt": SettingDescriptor(
+            icon: "qrcode",
+            description: "Shows a code to enter on your phone or computer. Rivulet then tells Trakt what you start, pause and finish. Your Trakt sign-in is shared with your other devices through iCloud Sync."
+        ),
+        "traktAccount": SettingDescriptor(
+            icon: "person.crop.circle",
+            description: "The Trakt account what you watch is sent to."
+        ),
+        "traktScrobble_plex": SettingDescriptor(
+            icon: "dot.radiowaves.left.and.right",
+            description: "Sends what you watch on Plex to Trakt. Turn this off if your Plex server already reports to Trakt, or every play counts twice."
+        ),
+        "traktScrobble_jellyfin": SettingDescriptor(
+            icon: "dot.radiowaves.left.and.right",
+            description: "Sends what you watch on Jellyfin to Trakt. Turn this off if your server has the Trakt plugin, or every play counts twice."
+        ),
+        "traktScrobble_emby": SettingDescriptor(
+            icon: "dot.radiowaves.left.and.right",
+            description: "Sends what you watch on Emby to Trakt. Turn this off if your server has the Trakt plugin, or every play counts twice."
+        ),
+        "traktScrobble_xtream": SettingDescriptor(
+            icon: "dot.radiowaves.left.and.right",
+            description: "Sends the Xtream films and series you watch to Trakt. Series need a TMDB key to be recognised."
+        ),
+        "traktSignOut": SettingDescriptor(
+            icon: "rectangle.portrait.and.arrow.right",
+            description: "Stops sending what you watch to Trakt."
+        ),
         "cat_about": SettingDescriptor(
             icon: "info.circle.fill",
             description: "App version, changelog, and other information about Rivulet."
@@ -690,6 +722,7 @@ enum SettingsDescriptorStore {
         case .libraries: return ("sidebar.squares.left", .systemPurple)
         case .homeRows: return ("rectangle.grid.1x2", .systemTeal)
         case .cache: return ("internaldrive", .systemGray)
+        case .trakt: return ("checkmark.circle.fill", .systemRed)
         case .appIconPicker: return ("app.badge", .systemPurple)
         case .homeHeroPicker: return ("sparkles.rectangle.stack", .systemPurple)
         case .detailRatingPicker: return ("star.leadinghalf.filled", .systemYellow)

@@ -34,6 +34,8 @@ nonisolated enum SyncCatalog {
         channelListsKey, "liveTVPinnedCategories", viewingsKey,
         // Xtream films and series: where the viewer is, and their favorites (the panel keeps neither)
         watchProgressKey, "xtreamFavorites", "xtreamVODContentLanguages", "xtreamVODLanguageChoice",
+        // Which servers tell Trakt what the viewer watches (the sign-in itself rides the vault)
+        "traktScrobble_plex", "traktScrobble_jellyfin", "traktScrobble_emby", "traktScrobble_xtream",
         // Servers the user turned off, by machine id
         "plexDisabledServers",
         // Photos

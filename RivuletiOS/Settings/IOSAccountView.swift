@@ -57,6 +57,14 @@ struct IOSAccountView: View {
                             }
                         }
                     }
+                    // Only in a build that carries Trakt's registration (`TraktConfig`).
+                    if TraktConfig.isConfigured {
+                        NavigationLink {
+                            IOSTraktSettingsView()
+                        } label: {
+                            Label { Text(verbatim: "Trakt") } icon: { Image(systemName: "checkmark.circle") }
+                        }
+                    }
                     NavigationLink {
                         IOSPhotoSettingsView()
                     } label: {

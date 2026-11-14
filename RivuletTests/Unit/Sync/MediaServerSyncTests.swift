@@ -25,7 +25,7 @@ final class MediaServerSyncTests: XCTestCase {
     }
 
     func test_bothAppsSyncJellyfinAndEmby() {
-        XCTAssertEqual(CloudSync.accountKinds.map(\.kind), ["plex", "livetv", "jellyfin", "emby", "tmdb"])
+        XCTAssertEqual(CloudSync.accountKinds.map(\.kind), ["plex", "livetv", "jellyfin", "emby", "tmdb", "trakt"])
     }
 
     func test_jellyfinExportsAccountAndToken() async throws {

@@ -227,6 +227,7 @@ enum SettingsContent {
         case .libraries:   return libraries
         case .homeRows:    return homeRows
         case .cache:       return cache
+        case .trakt:       return trakt
         case .iptv:        return iptv
         case .liveTVSourceDetail: return liveTVSourceDetail
         case .liveTVFavorites: return liveTVFavorites
@@ -435,12 +436,66 @@ enum SettingsContent {
             SettingsRowItem(id: "cat_liveTV",     title: "Live TV",    kind: .navigation(.liveTV)),
             SettingsRowItem(id: "cat_photos",     title: "Photos",     kind: .navigation(.photos)),
             SettingsRowItem(id: "cat_servers",    title: "Servers",    kind: .navigation(.servers)),
+        ] + traktRoot + [
             SettingsRowItem(id: "cache",          title: "Cache & Storage", kind: .navigation(.cache)),
             SettingsRowItem(id: "iCloudSync",     title: "iCloud Sync",
                             kind: .cycle(value: { iCloudSyncValue },
                                          next: { CloudSync.shared.setEnabled(!CloudSync.shared.isEnabled) })),
             SettingsRowItem(id: "cat_about",      title: "About",      kind: .navigation(.about))
         ]
+    }
+
+    /// Trakt shows only when the build carries its registration (`TraktConfig`).
+    private static var traktRoot: [SettingsRowItem] {
+        guard TraktConfig.isConfigured else { return [] }
+        return [SettingsRowItem(id: "cat_trakt", verbatim: "Trakt", kind: .navigationValue(.trakt, value: {
+            if case .signedIn(let name) = TraktAccount.shared.state { return name }
+            return String(localized: "Off")
+        }))]
+    }
+
+    // MARK: Trakt
+
+    /// Sign in, then which servers tell Trakt what the viewer watches.
+    private static var trakt: [SettingsRowItem] {
+        let account = TraktAccount.shared
+        guard account.isSignedIn else {
+            return [SettingsRowItem(id: "connectTrakt", title: "Connect to Trakt", kind: .action(destructive: false, handler: { vc in
+                vc.present(TraktSignInViewController { [weak vc] in
+                    (vc as? SettingsPageViewController)?.reloadRows()
+                }, animated: true)
+            }))]
+        }
+        account.refreshUsername()
+        var rows: [SettingsRowItem] = []
+        if case .signedIn(let name) = account.state, !name.isEmpty {
+            rows.append(SettingsRowItem(id: "traktAccount", title: "Account", kind: .info(value: { name })))
+        }
+        let servers = TraktScrobbleSettings.setUpKinds
+        if !servers.isEmpty { rows.append(.header("Send What You Watch")) }
+        rows += servers.map { kind in
+            SettingsRowItem(id: "traktScrobble_\(kind.rawValue)", verbatim: TraktScrobbleSettings.name(kind), kind: .toggle(
+                get: { TraktScrobbleSettings.isOn(kind) },
+                set: { TraktScrobbleSettings.set($0, for: kind) }))
+        }
+        rows.append(SettingsRowItem(id: "traktSignOut", title: "Sign Out", kind: .action(destructive: true, handler: { vc in
+            let page = vc as? SettingsPageViewController
+            if CloudSync.shared.isSynced(accountID: TraktAccount.syncID) {
+                presentSignOutChoice(
+                    on: vc, title: String(localized: "Sign Out of Trakt?"),
+                    message: String(localized: "Your Trakt sign-in is shared through iCloud. Sign out of this device only, or of every device?"),
+                    thisDevice: { account.signOut(scope: .thisDevice); page?.reloadRows() },
+                    everywhere: { account.signOut(scope: .everywhere); page?.reloadRows() })
+                return
+            }
+            presentConfirm(on: vc, title: "Sign Out of Trakt?",
+                           message: "What you watch here stops reaching Trakt.",
+                           confirmTitle: "Sign Out", destructive: true) {
+                account.signOut(scope: .everywhere)
+                page?.reloadRows()
+            }
+        })))
+        return rows
     }
 
     private static var iCloudSyncValue: String {

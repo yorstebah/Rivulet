@@ -6773,6 +6773,7 @@ final class UniversalPlayerViewModel: ObservableObject {
     }
 
     private func timelineReport(_ state: PlaybackTimeline.State, at time: TimeInterval) -> @MainActor () async -> String? {
+        reportToTrakt(state, at: time)
         if case .provider = source {
             let reportState: String
             switch state {
@@ -6797,6 +6798,27 @@ final class UniversalPlayerViewModel: ObservableObject {
             return report ?? { nil }
         }
         return preparePlexReport(time: time, state: state.rawValue, force: true) ?? { nil }
+    }
+
+    /// The same report, for Trakt (`TraktScrobbler`), which sends only the changes.
+    private func reportToTrakt(_ state: PlaybackTimeline.State, at time: TimeInterval) {
+        guard !isPlayingCinemaExtra else { return }
+        switch source {
+        case .provider(let playback):
+            let provider = playback.provider
+            let show = playback.item.grandparentRef
+            TraktScrobbler.shared.report(metadata, server: provider.kind, state: state, at: time) {
+                guard let show else { return [:] }
+                return (try? await provider.fullDetail(for: show))?.externalIDs ?? [:]
+            }
+        default:
+            let serverURL = serverURL, token = authToken, showKey = metadata.grandparentRatingKey
+            TraktScrobbler.shared.report(metadata, server: .plex, state: state, at: time) {
+                guard let showKey, let show = try? await PlexNetworkManager.shared.getMetadata(
+                    serverURL: serverURL, authToken: token, ratingKey: showKey, includeGuids: true) else { return [:] }
+                return TraktScrobbleItem.ids(guids: (show.Guid ?? []).compactMap(\.id) + [show.guid].compactMap { $0 })
+            }
+        }
     }
 
     @discardableResult

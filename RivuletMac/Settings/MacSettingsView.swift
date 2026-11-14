@@ -31,6 +31,11 @@ struct MacSettingsView: View {
                 MacLiveTVSettingsView()
                     .tabItem { Label("Live TV", systemImage: "play.tv") }
             }
+            // Only in a build that carries Trakt's registration (`TraktConfig`).
+            if TraktConfig.isConfigured {
+                MacTraktSettingsView()
+                    .tabItem { Label { Text(verbatim: "Trakt") } icon: { Image(systemName: "checkmark.circle") } }
+            }
             MacGeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
