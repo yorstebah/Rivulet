@@ -31,6 +31,23 @@ enum XtreamForYou {
         let categoryId: String?
         let rating: Double?
         let addedAt: Date?
+        /// The panel's genre labels, folded ("drama", "comedy"); none for a film (the list has none).
+        var genres: [String] = []
+    }
+
+    /// A panel genre line ("Drama / Comedy", "Action & Adventure, Crime") as folded labels.
+    static func genres(_ line: String?) -> [String] {
+        (line ?? "").split(whereSeparator: { $0 == "/" || $0 == "," || $0 == "|" })
+            .map { LiveChannelSearch.normalized(String($0)) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// A panel's rating as worth trusting: TMDB's average copied over, which reads 9.5 or more for
+    /// new titles with a handful of votes (one panel: 1,300 series at 10, mostly from this year),
+    /// so a score that high says nothing and counts as middling.
+    static func reliableRating(_ rating: Double?) -> Double {
+        guard let rating, rating > 0, rating < 9.5 else { return 6.5 }
+        return min(rating, 10)
     }
 
     /// How many titles the row holds, and the fewest worth a row.
@@ -136,12 +153,15 @@ enum XtreamForYou {
     /// Recommendations after each seed, ranked by how many seeds lead to a title, weighted by
     /// the seed and the place in its list; kept to the panel's titles the viewer has not seen.
     static func tmdbPicks(_ lists: [(seedWeight: Double, recommendations: [TMDBRecommendation])],
-                          index: Index, seen: Set<String>) -> [String] {
+                          index: Index, seen: Set<String>, languages: Set<String> = []) -> [String] {
         var scores: [String: Double] = [:]
         var firstSeen: [String: Int] = [:]
         var order = 0
         for list in lists {
             for (place, recommendation) in list.recommendations.enumerated() {
+                // In the languages the viewer watches, when those are known.
+                if !languages.isEmpty, let language = recommendation.originalLanguage,
+                   !languages.contains(language) { continue }
                 guard let id = index.match(recommendation), !seen.contains(id) else { continue }
                 scores[id, default: 0] += list.seedWeight * (1 - Double(place) / 40)
                 if firstSeen[id] == nil { firstSeen[id] = order; order += 1 }
@@ -154,37 +174,71 @@ enum XtreamForYou {
 
     // MARK: - The viewer's categories
 
-    /// Unseen titles from the seeds' categories, by how much those categories weigh, then by
-    /// rating and how new the title is on the panel.
+    /// Unseen titles from the seeds' categories, by how much their genres and category share with
+    /// the seeds, then by a rating worth trusting and how new the title is on the panel. One copy
+    /// per name: a panel lists a series once per language.
     static func categoryPicks(_ candidates: [Candidate], seeds: [Seed], seen: Set<String>,
                               now: Date = Date(), limit: Int = rowSize) -> [String] {
         let byId = Dictionary(candidates.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var categoryWeight: [String: Double] = [:]
+        var genreWeight: [String: Double] = [:]
+        var seenNames = Set<String>()
         for seed in seeds {
-            guard let category = byId[seed.id]?.categoryId else { continue }
-            categoryWeight[category, default: 0] += seed.weight
+            guard let title = byId[seed.id] else { continue }
+            if let category = title.categoryId { categoryWeight[category, default: 0] += seed.weight }
+            for genre in title.genres { genreWeight[genre, default: 0] += seed.weight }
         }
+        for id in seen { if let title = byId[id] { seenNames.insert(LiveChannelSearch.normalized(title.name)) } }
         guard let strongest = categoryWeight.values.max(), strongest > 0 else { return [] }
+        let strongestGenre = genreWeight.values.max() ?? 0
+
         func score(_ candidate: Candidate) -> Double {
             let category = (candidate.categoryId.flatMap { categoryWeight[$0] } ?? 0) / strongest
-            let rating = min(max(candidate.rating ?? 5, 0), 10) / 10
+            // How much of the title's genre line the seeds share. Divided by the root of its length,
+            // so sharing two of the seeds' genres ("Drama / Comedy") beats sharing one ("Drama"),
+            // while a long line of unshared genres still dilutes it.
+            var genre = 0.0
+            if strongestGenre > 0, !candidate.genres.isEmpty {
+                let shared = candidate.genres.map { (genreWeight[$0] ?? 0) / strongestGenre }.reduce(0, +)
+                genre = shared / Double(candidate.genres.count).squareRoot()
+            }
+            let rating = reliableRating(candidate.rating) / 10
             let ageDays = candidate.addedAt.map { max(now.timeIntervalSince($0), 0) / 86_400 } ?? 365
             let newness = pow(0.5, ageDays / 90)
-            // Quality outweighs freshness: newness only breaks near-ties in rating.
-            return category * 3 + rating + newness * 0.25
+            // Genres say most about taste; a streaming service's category mixes every country.
+            // Quality outweighs freshness: newness only breaks near-ties.
+            return category * 1.5 + genre * 2.5 + rating + newness * 0.25
         }
-        var scored: [(id: String, score: Double)] = []
+
+        var scored: [(id: String, name: String, score: Double)] = []
         for candidate in candidates where !seen.contains(candidate.id) {
             guard let category = candidate.categoryId, categoryWeight[category] != nil else { continue }
-            scored.append((candidate.id, score(candidate)))
+            scored.append((candidate.id, LiveChannelSearch.normalized(candidate.name), score(candidate)))
         }
         scored.sort { lhs, rhs in lhs.score != rhs.score ? lhs.score > rhs.score : lhs.id < rhs.id }
-        return scored.prefix(limit).map { $0.id }
+        var picks: [String] = []
+        for entry in scored where picks.count < limit {
+            guard seenNames.insert(entry.name).inserted else { continue }
+            picks.append(entry.id)
+        }
+        return picks
     }
 
-    /// TMDB's picks first, then the viewer's categories, without repeats, `rowSize` at most.
-    static func merge(_ tmdb: [String], _ categories: [String]) -> [String] {
+    /// Keeps titles in the viewer's languages, in order: those known to be in one first, then
+    /// those whose language is unknown. Without languages to go by, all of them.
+    static func inLanguages(_ ids: [String], languages: Set<String>, languageOf: [String: String]) -> [String] {
+        guard !languages.isEmpty else { return ids }
+        let known = ids.filter { languageOf[$0].map(languages.contains) == true }
+        let unknown = ids.filter { languageOf[$0] == nil }
+        return known + unknown
+    }
+
+    /// TMDB's picks first, then the viewer's categories, without repeats (by id, or by name when
+    /// names are given: one copy per series), `rowSize` at most.
+    static func merge(_ tmdb: [String], _ categories: [String], names: [String: String] = [:]) -> [String] {
         var seen = Set<String>()
-        return (tmdb + categories).filter { seen.insert($0).inserted }.prefix(rowSize).map { $0 }
+        return (tmdb + categories).filter { id in
+            seen.insert(id).inserted && (names[id].map { seen.insert("name:" + $0).inserted } ?? true)
+        }.prefix(rowSize).map { $0 }
     }
 }

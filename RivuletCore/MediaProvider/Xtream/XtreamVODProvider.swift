@@ -430,9 +430,12 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     // MARK: - For You
 
     private let forYouCache = OSAllocatedUnfairLock(initialState: [String: (key: String, ids: [String], at: Date)]())
+    private let forYouWork = OSAllocatedUnfairLock(initialState: [String: (key: String, task: Task<[String], Never>)]())
 
     /// The library's For You row (`XtreamForYou`), also on Home. Worked out again only when
     /// what it starts from changes or after six hours: Home asks for its rows on every reload.
+    /// With TMDB that takes a few seconds the first time, so the page waits at most three and
+    /// shows the row on its next load when the work runs longer.
     func forYouHub(in library: MediaLibrary, now: Date = Date()) async -> MediaHub? {
         guard let kind = XtreamVODLibrary(rawValue: library.id) else { return nil }
         let state = await state()
@@ -443,14 +446,33 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         let newest = state.records.values.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0
         let cacheKey = seeds.map(\.id).joined(separator: ",") + "|\(hasKey)|\(state.records.count)|\(newest)"
         let cached = forYouCache.withLock { $0[library.id] }
-        let ids: [String]
-        if let cached, cached.key == cacheKey, now.timeIntervalSince(cached.at) < 6 * 3600 {
-            ids = cached.ids
-        } else {
-            ids = await forYouIDs(kind, seeds: seeds, state: state, useTMDB: hasKey, now: now)
-            forYouCache.withLock { $0[library.id] = (cacheKey, ids, now) }
+        var ids = cached?.ids
+        if cached == nil || cached?.key != cacheKey || now.timeIntervalSince(cached!.at) >= 6 * 3600 {
+            let work = forYouWork.withLock { running -> Task<[String], Never> in
+                if let current = running[library.id], current.key == cacheKey { return current.task }
+                let task = Task { [weak self] () -> [String] in
+                    guard let self else { return [] }
+                    let found = await self.forYouIDs(kind, seeds: seeds, state: state, useTMDB: hasKey, now: now)
+                    self.forYouCache.withLock { $0[library.id] = (cacheKey, found, Date()) }
+                    self.forYouWork.withLock { $0[library.id] = nil }
+                    return found
+                }
+                running[library.id] = (cacheKey, task)
+                return task
+            }
+            let fresh = await withTaskGroup(of: [String]?.self) { group in
+                group.addTask { await work.value }
+                group.addTask {
+                    try? await Task.sleep(for: .seconds(3))
+                    return nil
+                }
+                let first = await group.next() ?? nil
+                group.cancelAll()
+                return first
+            }
+            if let fresh { ids = fresh }
         }
-        guard ids.count >= XtreamForYou.minimumRow, let items = try? await titles(ids, in: kind, state: state),
+        guard let ids, ids.count >= XtreamForYou.minimumRow, let items = try? await titles(ids, in: kind, state: state),
               items.count >= XtreamForYou.minimumRow else { return nil }
         return MediaHub(id: "\(library.id).forYou", providerID: id, title: String(localized: "For You"),
                         style: .shelf, items: items, isPromoted: true)
@@ -460,7 +482,6 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
                            useTMDB: Bool, now: Date) async -> [String] {
         let seen = XtreamForYou.seen(state, source: id, library: kind)
         let candidates: [XtreamForYou.Candidate]
-        var names: [String: (name: String, year: Int?)] = [:]
         switch kind {
         case .movies:
             guard let movies = try? await catalog.movieLists().titles else { return [] }
@@ -469,18 +490,22 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         case .series:
             guard let series = try? await catalog.seriesLists().titles else { return [] }
             candidates = series.map { .init(id: $0.id, name: $0.name, year: $0.year, categoryId: $0.categoryId,
-                                            rating: $0.rating, addedAt: $0.updatedAt) }
+                                            rating: $0.rating, addedAt: $0.updatedAt,
+                                            genres: XtreamForYou.genres($0.genre)) }
         }
-        let seedIDs = Set(seeds.map(\.id))
-        for candidate in candidates where seedIDs.contains(candidate.id) {
-            names[candidate.id] = (candidate.name, candidate.year)
-        }
+        let byID = Dictionary(candidates.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let names = byID.mapValues { LiveChannelSearch.normalized($0.name) }
         var tmdbPicks: [String] = []
+        var languages = Set<String>()
+        let tmdbKind: TMDBLookup.Kind = kind == .movies ? .movie : .tv
         if useTMDB {
-            let tmdbKind: TMDBLookup.Kind = kind == .movies ? .movie : .tv
             var lists: [(seedWeight: Double, recommendations: [TMDBRecommendation])] = []
             for seed in seeds.prefix(XtreamForYou.tmdbSeedLimit) {
-                guard let title = names[seed.id] else { continue }
+                guard let title = byID[seed.id] else { continue }
+                // The language the viewer watches it in is the title's own, whatever the panel's tag.
+                if let language = await tmdb.originalLanguage(tmdbKind, name: title.name, year: title.year) {
+                    languages.insert(language)
+                }
                 // The panel's TMDB id when it gives one (a film's info), else TMDB's search.
                 var tmdbID: Int?
                 if kind == .movies { tmdbID = (try? await catalog.movieInfo(seed.id))?.tmdbId.flatMap(Int.init) }
@@ -490,10 +515,23 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
                 guard let tmdbID else { continue }
                 lists.append((seed.weight, await tmdb.recommendations(tmdbKind, tmdbID: tmdbID)))
             }
-            tmdbPicks = XtreamForYou.tmdbPicks(lists, index: XtreamForYou.Index(candidates), seen: seen)
+            tmdbPicks = XtreamForYou.tmdbPicks(lists, index: XtreamForYou.Index(candidates), seen: seen,
+                                               languages: languages)
         }
-        let categoryPicks = XtreamForYou.categoryPicks(candidates, seeds: seeds, seen: seen, now: now)
-        return XtreamForYou.merge(tmdbPicks, categoryPicks)
+        var categoryPicks = XtreamForYou.categoryPicks(candidates, seeds: seeds, seen: seen, now: now,
+                                                       limit: languages.isEmpty ? XtreamForYou.rowSize : 40)
+        if !languages.isEmpty {
+            // A streaming service's category mixes every country: keep the viewer's languages.
+            var languageOf: [String: String] = [:]
+            for pick in categoryPicks {
+                guard let title = byID[pick] else { continue }
+                if let language = await tmdb.originalLanguage(tmdbKind, name: title.name, year: title.year) {
+                    languageOf[pick] = language
+                }
+            }
+            categoryPicks = XtreamForYou.inLanguages(categoryPicks, languages: languages, languageOf: languageOf)
+        }
+        return XtreamForYou.merge(tmdbPicks, categoryPicks, names: names)
     }
 
     /// The library's titles with these ids, in this order.

@@ -87,4 +87,38 @@ final class XtreamForYouTests: XCTestCase {
         ], kind: .tv)
         XCTAssertEqual(found, [TMDBRecommendation(id: 2, title: "Dark", originalTitle: "Dark", year: 2017)])
     }
+
+    func test_genresOutweighTheCategory_andAPlaceholderTenRatesMiddling() {
+        let seed = XtreamForYou.Candidate(id: "ted", name: "Ted Lasso", year: 2020, categoryId: "appletv", rating: 8,
+                                          addedAt: nil, genres: XtreamForYou.genres("Drama / Comedy"))
+        func series(_ id: String, _ name: String, rating: Double?, genre: String) -> XtreamForYou.Candidate {
+            .init(id: id, name: name, year: 2024, categoryId: "appletv", rating: rating, addedAt: nil,
+                  genres: XtreamForYou.genres(genre))
+        }
+        let candidates = [
+            seed,
+            series("new", "A New Thriller", rating: 10, genre: "Action & Adventure / Crime"),
+            series("both", "Shrinking", rating: 8, genre: "Drama / Comedy"),
+            series("drama", "Severance", rating: 8, genre: "Drama"),
+            series("both2", "Shrinking", rating: 7, genre: "Comedy / Drama"),
+        ]
+        let picks = XtreamForYou.categoryPicks(candidates, seeds: [.init(id: "ted", weight: 1.5)], seen: ["ted"], now: now)
+        // Both genres beat one; the placeholder 10 counts for nothing; one copy per name.
+        XCTAssertEqual(picks, ["both", "drama", "new"])
+        XCTAssertEqual(XtreamForYou.reliableRating(10), 6.5)
+        XCTAssertEqual(XtreamForYou.reliableRating(8.2), 8.2)
+        XCTAssertEqual(XtreamForYou.genres("Action & Adventure, Crime"), ["action adventure", "crime"])
+    }
+
+    func test_languages_keepTheViewers_thenUnknown_andFilterRecommendations() {
+        XCTAssertEqual(XtreamForYou.inLanguages(["ko", "en", "unknown", "en2"], languages: ["en"],
+                                                languageOf: ["ko": "ko", "en": "en", "en2": "en"]),
+                       ["en", "en2", "unknown"])
+        XCTAssertEqual(XtreamForYou.inLanguages(["a", "b"], languages: [], languageOf: ["a": "ko"]), ["a", "b"])
+        let index = XtreamForYou.Index([candidate("1", "Kingdom"), candidate("2", "Succession")])
+        let recs = [TMDBRecommendation(id: 1, title: "Kingdom", originalTitle: nil, year: nil, originalLanguage: "ko"),
+                    TMDBRecommendation(id: 2, title: "Succession", originalTitle: nil, year: nil, originalLanguage: "en")]
+        XCTAssertEqual(XtreamForYou.tmdbPicks([(1, recs)], index: index, seen: [], languages: ["en"]), ["2"])
+        XCTAssertEqual(XtreamForYou.merge(["1"], ["3", "1", "4"], names: ["3": "kingdom", "1": "kingdom"]), ["1", "4"])
+    }
 }

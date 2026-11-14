@@ -45,6 +45,8 @@ nonisolated struct TMDBRecommendation: Sendable, Hashable {
     let title: String
     let originalTitle: String?
     let year: Int?
+    /// ISO 639-1 ("en", "ko").
+    var originalLanguage: String? = nil
 }
 
 actor TMDBLookup {
@@ -60,6 +62,7 @@ actor TMDBLookup {
     private let language: String
     private var cache: [String: TMDBTitle?] = [:]
     private var recommendationCache: [String: [TMDBRecommendation]] = [:]
+    private var languageCache: [String: String?] = [:]
 
     init(apiKey: @escaping @Sendable () async -> String?, session: URLSession = .shared,
          language: String = Locale.preferredLanguages.first ?? "en-US") {
@@ -101,6 +104,26 @@ actor TMDBLookup {
         return found
     }
 
+    /// A title's original language (ISO 639-1) by one search: the first result agreeing on the
+    /// year, or without a year carrying the same title. Kept for the session; nil when unsure.
+    func originalLanguage(_ kind: Kind, name: String, year: Int?) async -> String? {
+        guard let key = await apiKey(), !key.isEmpty else { return nil }
+        let cacheKey = "\(kind.rawValue)|\(name)|\(year.map(String.init) ?? "")"
+        if let known = languageCache[cacheKey] { return known }
+        var query = [URLQueryItem(name: "query", value: name), URLQueryItem(name: "language", value: language)]
+        if let year {
+            query.append(URLQueryItem(name: kind == .movie ? "year" : "first_air_date_year", value: String(year)))
+        }
+        var found: String?
+        if let json = await get("search/\(kind.rawValue)", query, key: key) as? [String: Any],
+           let results = json["results"] as? [[String: Any]],
+           let id = Self.match(results, kind: kind, name: name, year: year) {
+            found = results.first { $0["id"] as? Int == id }?["original_language"] as? String
+        }
+        languageCache[cacheKey] = found
+        return found
+    }
+
     static func recommendations(_ results: [[String: Any]], kind: Kind) -> [TMDBRecommendation] {
         results.compactMap { result in
             guard let id = result["id"] as? Int,
@@ -108,7 +131,8 @@ actor TMDBLookup {
             let date = result[kind == .movie ? "release_date" : "first_air_date"] as? String
             return TMDBRecommendation(id: id, title: title,
                                       originalTitle: result[kind == .movie ? "original_title" : "original_name"] as? String,
-                                      year: date.flatMap { Int($0.prefix(4)) })
+                                      year: date.flatMap { Int($0.prefix(4)) },
+                                      originalLanguage: result["original_language"] as? String)
         }
     }
 
