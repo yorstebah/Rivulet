@@ -28,6 +28,7 @@ nonisolated enum SyncCatalog {
         // Live TV (not recents or event slots: device habit). Viewings are what For You learns
         // from, so it suggests the same on every device.
         "liveTVLayout", "liveTVKeepPlayingInGuide", "combineLiveTVSources", "confirmExitMultiview",
+        XtreamVODRefresh.defaultsKey,
         "liveTVSuggestions", "liveTVFavoriteChannelIds", "liveTVUnfavoritedChannelIds",
         "liveTVHiddenPlexServers", "liveTVHideJellyfin", "liveTVHideEmby",
         // The viewer's own and smart channel lists, and pinned categories

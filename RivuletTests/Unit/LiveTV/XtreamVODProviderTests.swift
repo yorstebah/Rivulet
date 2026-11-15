@@ -194,8 +194,8 @@ final class XtreamVODProviderTests: XCTestCase {
         // Two days old and the panel is down: the stale copy still lists.
         let catalog = XtreamVODCatalog(service: XtreamService(account: account, session: session()),
                                        sourceID: source, directory: directory)
-        XCTAssertTrue(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-3600)))
-        XCTAssertFalse(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-2 * 86400)))
+        XCTAssertTrue(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-3600), lifetime: 86400))
+        XCTAssertFalse(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-2 * 86400), lifetime: 86400))
         let file = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .first { $0.lastPathComponent.contains("-movies") })
         var stale = try JSONDecoder().decode(XtreamVODLists<XtreamMovie>.self, from: Data(contentsOf: file))
@@ -225,6 +225,33 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertEqual(action.map(\.title), ["Heat", "1917"])
         let letters = try await provider.letterCounts(in: movies)
         XCTAssertEqual(letters.map(\.title), ["#", "H", "U"])
+    }
+
+    func test_refreshInterval_choicesAndOff() {
+        XCTAssertEqual(XtreamVODRefresh.lifetime(hours: 6), 6 * 3600)
+        XCTAssertNil(XtreamVODRefresh.lifetime(hours: 0))
+        XCTAssertEqual(XtreamVODRefresh.next(after: 168), 0)
+        XCTAssertEqual(XtreamVODRefresh.next(after: 0), 6)
+        XCTAssertEqual(XtreamVODRefresh.next(after: 5), 72, "an unknown value moves on from the default")
+        // Off: a month-old copy is still used; one dated ahead of the clock never is.
+        XCTAssertTrue(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-30 * 86400), lifetime: nil))
+        XCTAssertFalse(XtreamVODCatalog.isFresh(Date().addingTimeInterval(3600), lifetime: nil))
+        XCTAssertFalse(XtreamVODCatalog.isFresh(Date().addingTimeInterval(-7 * 3600), lifetime: 6 * 3600))
+    }
+
+    func test_refreshingTheLists_asksThePanelAgain_andAFailureKeepsThem() async throws {
+        let provider = provider()
+        let movies = try await provider.libraries()[0]
+        _ = try await provider.items(in: movies, sort: .titleAsc, page: Page(offset: 0, limit: 10))
+        let before = FakePanel.requests.filter { $0 == "get_vod_streams" || $0 == "get_series" }.count
+
+        try await provider.refreshLists()
+        XCTAssertEqual(FakePanel.requests.filter { $0 == "get_vod_streams" || $0 == "get_series" }.count, before + 2)
+
+        FakePanel.failing = true
+        try? await provider.refreshLists()
+        let kept = try await provider.items(in: movies, sort: .titleAsc, page: Page(offset: 0, limit: 10))
+        XCTAssertEqual(kept.total, 3)
     }
 
     func test_aFilmListedWithoutAPoster_takesTheOneInItsDetails() async throws {

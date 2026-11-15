@@ -64,6 +64,11 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         self.traktPicks = traktPicks
     }
 
+    /// The film and series lists fetched again now; the libraries repaint from them.
+    func refreshLists() async throws {
+        try await catalog.refresh()
+    }
+
     // MARK: - Watch state
 
     private func state() async -> XtreamVODMapping.State {

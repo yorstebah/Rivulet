@@ -20,9 +20,6 @@ nonisolated struct XtreamVODLists<Title: Codable & Sendable>: Codable, Sendable 
 }
 
 actor XtreamVODCatalog {
-    /// How long a list is used before it is asked for again.
-    static let lifetime: TimeInterval = 24 * 3600
-
     let service: XtreamService
     let sourceID: String
     private let directory: URL?
@@ -34,6 +31,9 @@ actor XtreamVODCatalog {
     private var movieInfos: [String: XtreamMovieInfo] = [:]
     private var seriesInfos: [String: XtreamSeriesInfo] = [:]
     private var seriesInfoLoads: [String: Task<XtreamSeriesInfo, Error>] = [:]
+    /// Set by `refresh()`: the next read fetches, whatever the copy's age.
+    private var refetchMovies = false
+    private var refetchSeries = false
 
     /// Work done once per list rather than per page or keystroke: each sort's order,
     /// the names folded for search, the A to Z counts. Keyed by the list's fetch time.
@@ -106,11 +106,22 @@ actor XtreamVODCatalog {
 
     // MARK: Lists
 
+    /// Both lists fetched again now (the source page's Refresh Movies and TV Shows). A panel
+    /// that fails keeps the lists it had.
+    func refresh() async throws {
+        refetchMovies = true
+        refetchSeries = true
+        async let films = movieLists()
+        async let shows = seriesLists()
+        _ = try await (films, shows)
+    }
+
     func movieLists() async throws -> XtreamVODLists<XtreamMovie> {
-        if let movies, Self.isFresh(movies.fetchedAt) { return movies }
-        if let movieLoad { return try await movieLoad.value }
+        if !refetchMovies, let movies, Self.isFresh(movies.fetchedAt) { return movies }
+        // A fetch already under way is as new as a refresh would be.
+        if let movieLoad { refetchMovies = false; return try await movieLoad.value }
         let stale = movies ?? read("movies")
-        if let stale, Self.isFresh(stale.fetchedAt) {
+        if !refetchMovies, let stale, Self.isFresh(stale.fetchedAt) {
             movies = stale
             return stale
         }
@@ -121,6 +132,7 @@ actor XtreamVODCatalog {
             return XtreamVODLists(titles: titles, categories: (try? await categories) ?? [], fetchedAt: Date())
         }
         movieLoad = task
+        refetchMovies = false
         defer { movieLoad = nil }
         do {
             let fetched = try await task.value
@@ -135,10 +147,10 @@ actor XtreamVODCatalog {
     }
 
     func seriesLists() async throws -> XtreamVODLists<XtreamSeries> {
-        if let series, Self.isFresh(series.fetchedAt) { return series }
-        if let seriesLoad { return try await seriesLoad.value }
+        if !refetchSeries, let series, Self.isFresh(series.fetchedAt) { return series }
+        if let seriesLoad { refetchSeries = false; return try await seriesLoad.value }
         let stale = series ?? read("series")
-        if let stale, Self.isFresh(stale.fetchedAt) {
+        if !refetchSeries, let stale, Self.isFresh(stale.fetchedAt) {
             series = stale
             return stale
         }
@@ -149,6 +161,7 @@ actor XtreamVODCatalog {
             return XtreamVODLists(titles: titles, categories: (try? await categories) ?? [], fetchedAt: Date())
         }
         seriesLoad = task
+        refetchSeries = false
         defer { seriesLoad = nil }
         do {
             let fetched = try await task.value
@@ -278,8 +291,13 @@ actor XtreamVODCatalog {
 
     // MARK: Disk
 
-    static func isFresh(_ date: Date, now: Date = Date()) -> Bool {
-        now.timeIntervalSince(date) < lifetime && date <= now.addingTimeInterval(60)
+    /// Younger than the viewer's refresh interval (`XtreamVODRefresh`); with it Off, any copy
+    /// is. One dated ahead of the clock never is.
+    static func isFresh(_ date: Date, now: Date = Date(),
+                        lifetime: TimeInterval? = XtreamVODRefresh.lifetime()) -> Bool {
+        guard date <= now.addingTimeInterval(60) else { return false }
+        guard let lifetime else { return true }
+        return now.timeIntervalSince(date) < lifetime
     }
 
     private func file(_ name: String) -> URL? {

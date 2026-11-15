@@ -530,6 +530,18 @@ enum SettingsDescriptorStore {
             icon: "arrow.clockwise",
             description: "Reloads this source's channels and guide."
         ),
+        "refreshGuide": SettingDescriptor(
+            icon: "calendar.badge.clock",
+            description: "Reloads the guide only, for when it stays empty or out of date."
+        ),
+        "refreshXtreamVOD": SettingDescriptor(
+            icon: "arrow.clockwise",
+            description: "Fetches this provider's films and series again now, for titles added since."
+        ),
+        "src_xtreamRefreshEvery": SettingDescriptor(
+            icon: "clock.arrow.circlepath",
+            description: "How often the films and series of every Xtream source are fetched again. Off keeps them until you refresh them here."
+        ),
         "removeSource": SettingDescriptor(
             icon: "trash",
             description: "Remove this Live TV source and all its channels."

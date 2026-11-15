@@ -96,6 +96,7 @@ private struct MacLiveSourceDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingRemove = false
     @State private var isRefreshing = false
+    @State private var isRefreshingGuide = false
 
     private var source: LiveTVDataStore.LiveTVSourceInfo? { MacLiveSourceList.all(store).first { $0.id == sourceId } }
 
@@ -166,7 +167,20 @@ private struct MacLiveSourceDetailSheet: View {
                                 if isRefreshing { ProgressView().controlSize(.small) }
                             }
                         }
-                        .disabled(isRefreshing)
+                        .disabled(isRefreshing || isRefreshingGuide)
+                        Button {
+                            isRefreshingGuide = true
+                            Task {
+                                await store.loadEPG(startDate: Date(), hours: LiveTVDataStore.refreshWindowHours)
+                                isRefreshingGuide = false
+                            }
+                        } label: {
+                            HStack {
+                                Text("Refresh Guide")
+                                if isRefreshingGuide { ProgressView().controlSize(.small) }
+                            }
+                        }
+                        .disabled(isRefreshing || isRefreshingGuide)
                     }
                     // A server's own Live TV leaves with its sign-in.
                     if !source.sourceType.followsServer {
@@ -203,19 +217,49 @@ private struct MacLiveSourceDetailSheet: View {
 /// An Xtream source's films and series: the switch, and the TMDB key their detail pages use.
 private struct MacXtreamVODSection: View {
     let sourceId: String
+    @EnvironmentObject private var browse: BrowseStore
     @State private var enabled = true
     @State private var tmdbKey = ""
     @State private var loadedKey = ""
+    @State private var refreshHours = XtreamVODRefresh.hours
+    @State private var isRefreshing = false
 
     var body: some View {
-        Section {
-            Toggle("Movies and TV Shows", isOn: $enabled)
-                .onChange(of: enabled) { _, on in XtreamVODSources.setEnabled(on, for: sourceId) }
-            SecureField("TMDB API Key", text: $tmdbKey)
-                .autocorrectionDisabled()
-                .onSubmit(saveKey)
-        } footer: {
-            Text("The provider's films and series appear as Movies and TV Shows libraries. With your own free key from themoviedb.org, their pages show the plot in your language, the cast with photos and more.")
+        Group {
+            Section {
+                Toggle("Movies and TV Shows", isOn: $enabled)
+                    .onChange(of: enabled) { _, on in XtreamVODSources.setEnabled(on, for: sourceId) }
+                SecureField("TMDB API Key", text: $tmdbKey)
+                    .autocorrectionDisabled()
+                    .onSubmit(saveKey)
+            } footer: {
+                Text("The provider's films and series appear as Movies and TV Shows libraries. With your own free key from themoviedb.org, their pages show the plot in your language, the cast with photos and more.")
+            }
+            if enabled {
+                Section {
+                    Picker("Refresh Movies and TV Shows", selection: $refreshHours) {
+                        ForEach(XtreamVODRefresh.choices, id: \.self) { Text(verbatim: XtreamVODRefresh.name($0)).tag($0) }
+                    }
+                    .onChange(of: refreshHours) { _, hours in XtreamVODRefresh.setHours(hours) }
+                    Button {
+                        isRefreshing = true
+                        Task {
+                            let provider = MediaProviderRegistry.shared.provider(for: sourceId) as? XtreamVODProvider
+                            try? await provider?.refreshLists()
+                            await browse.refresh()
+                            isRefreshing = false
+                        }
+                    } label: {
+                        HStack {
+                            Text("Refresh Movies and TV Shows Now")
+                            if isRefreshing { ProgressView().controlSize(.small) }
+                        }
+                    }
+                    .disabled(isRefreshing)
+                } footer: {
+                    Text("How often the films and series of every Xtream source are fetched again. Off keeps them until you refresh them here.")
+                }
+            }
         }
         .onAppear {
             enabled = XtreamVODSources.isEnabled(sourceId)
