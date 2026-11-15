@@ -2258,6 +2258,9 @@ final class LiveTVAetherPlayerViewController: UIViewController {
                 dismiss(animated: true)
                 return
             case .select:
+                // The guide over the picture owns Select: it picks the channel. Taken here too,
+                // it brought the rail up, which took focus from the guide mid-selection.
+                if guideOverlay != nil { break }
                 if scrubTarget != nil {
                     // Click to play from the scrubbed spot.
                     resumePlayback()
