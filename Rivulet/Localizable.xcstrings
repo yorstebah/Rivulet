@@ -1,6 +1,11 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Loading channels" : {},
+    "Loading films" : {},
+    "Loading guide" : {},
+    "Loading series" : {},
+    "Processing…" : {},
     "Connect to Trakt" : {},
     "Connected to Trakt" : {},
     "Connecting to Trakt…" : {},

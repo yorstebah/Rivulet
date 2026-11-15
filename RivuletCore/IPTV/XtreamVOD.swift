@@ -104,7 +104,12 @@ extension XtreamService {
     }
 
     func movies(inCategory categoryId: String? = nil) async throws -> [XtreamMovie] {
-        Self.movies(from: try await vod("get_vod_streams", categoryId.map { [URLQueryItem(name: "category_id", value: $0)] } ?? []))
+        // The whole list is the long wait; one category is quick.
+        let report = categoryId == nil ? LoadingActivity.begin(.films) : nil
+        defer { report?.finish() }
+        let json = try await vod("get_vod_streams", categoryId.map { [URLQueryItem(name: "category_id", value: $0)] } ?? [],
+                                 progress: report)
+        return Self.movies(from: json)
     }
 
     func movieInfo(_ movieId: String) async throws -> XtreamMovieInfo {
@@ -116,14 +121,18 @@ extension XtreamService {
     }
 
     func series(inCategory categoryId: String? = nil) async throws -> [XtreamSeries] {
-        Self.series(from: try await vod("get_series", categoryId.map { [URLQueryItem(name: "category_id", value: $0)] } ?? []))
+        let report = categoryId == nil ? LoadingActivity.begin(.series) : nil
+        defer { report?.finish() }
+        let json = try await vod("get_series", categoryId.map { [URLQueryItem(name: "category_id", value: $0)] } ?? [],
+                                 progress: report)
+        return Self.series(from: json)
     }
 
     func seriesInfo(_ seriesId: String) async throws -> XtreamSeriesInfo {
         Self.seriesInfo(from: try await vod("get_series_info", [URLQueryItem(name: "series_id", value: seriesId)]))
     }
 
-    private func vod(_ action: String, _ query: [URLQueryItem] = []) async throws -> Any {
+    private func vod(_ action: String, _ query: [URLQueryItem] = [], progress: LoadingReport? = nil) async throws -> Any {
         var components = URLComponents(url: account.server.appendingPathComponent("player_api.php"),
                                        resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "username", value: account.username),
@@ -133,7 +142,9 @@ extension XtreamService {
         components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         let (data, response) = try await BoundedDownload.data(for: URLRequest(url: components.url!),
                                                               limit: BoundedDownload.playlistLimit,
-                                                              configuration: session.configuration)
+                                                              configuration: session.configuration,
+                                                              progress: progress)
+        progress?.processing()
         return try Self.parse(data, status: (response as? HTTPURLResponse)?.statusCode ?? 200)
     }
 

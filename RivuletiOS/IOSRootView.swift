@@ -76,6 +76,8 @@ struct IOSRootView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        // Large loads (an Xtream panel's lists, a guide); the full-screen player covers it.
+        .overlay(alignment: .top) { LoadingPill() }
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
         .environment(\.openAccount) { showingAccount = true }
