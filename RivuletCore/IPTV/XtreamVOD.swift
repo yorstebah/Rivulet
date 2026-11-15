@@ -298,6 +298,7 @@ extension XtreamService {
     /// A year many panels put at the end of the name instead of in a field ("White Chicks - 2004",
     /// "Wildschut (1985)"): the name without it, and the year. A name that is only a year keeps it.
     nonisolated static func splitYear(_ name: String) -> (name: String, year: Int?) {
+        if let release = splitReleaseName(name) { return release }
         let patterns = [#"\s*[-–|]\s*((?:19|20)\d\d)\s*$"#, #"\s*\(((?:19|20)\d\d)\)(?:\s*\([A-Za-z]{2,8}\))?\s*$"#]
         for pattern in patterns {
             guard let match = name.range(of: pattern, options: .regularExpression) else { continue }
@@ -310,6 +311,40 @@ extension XtreamService {
         }
         return (name, nil)
     }
+
+    /// A raw release file name, which panels list before they fill in the film's details
+    /// ("lights.out.2024.1080p.web.h264-cbfm"): the words up to the year or the first quality
+    /// marker, title-cased ("Lights Out"), and the year. nil for an ordinary name, which has
+    /// spaces, or one with no marker to cut at ("S.W.A.T.").
+    nonisolated static func splitReleaseName(_ name: String) -> (name: String, year: Int?)? {
+        guard !name.contains(where: \.isWhitespace), name.contains(where: { $0 == "." || $0 == "_" }) else { return nil }
+        let words = name.split(whereSeparator: { $0 == "." || $0 == "_" }).map(String.init)
+        let latest = Calendar.current.component(.year, from: Date()) + 1
+        func year(_ word: String) -> Int? {
+            guard word.count == 4, let value = Int(word), (1900...latest).contains(value) else { return nil }
+            return value
+        }
+        func isMarker(_ word: String) -> Bool {
+            let head = word.lowercased().split(separator: "-").first.map(String.init) ?? ""
+            return releaseMarkers.contains(head) || head.range(of: #"^\d{3,4}[pi]$"#, options: .regularExpression) != nil
+        }
+        guard let cut = words.indices.dropFirst().first(where: { year(words[$0]) != nil || isMarker(words[$0]) })
+        else { return nil }
+        let title = words[..<cut].enumerated().map { index, word -> String in
+            guard word == word.lowercased() else { return word }
+            if index > 0, releaseSmallWords.contains(word) { return word }
+            return word.prefix(1).uppercased() + word.dropFirst()
+        }
+        return (title.joined(separator: " "), year(words[cut]))
+    }
+
+    private nonisolated static let releaseMarkers: Set<String> = [
+        "4k", "uhd", "hdr", "web", "webrip", "webdl", "web-dl", "bluray", "blu-ray", "brrip", "bdrip", "dvdrip",
+        "hdtv", "hdrip", "x264", "x265", "h264", "h265", "hevc", "remux", "proper", "repack", "internal",
+    ]
+    private nonisolated static let releaseSmallWords: Set<String> = [
+        "a", "an", "and", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with",
+    ]
 
     private nonisolated static func list(_ json: Any) -> [[String: Any]] {
         json as? [[String: Any]] ?? []

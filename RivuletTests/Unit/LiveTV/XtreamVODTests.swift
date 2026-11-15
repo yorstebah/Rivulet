@@ -189,6 +189,24 @@ final class XtreamVODTests: XCTestCase {
         XCTAssertEqual(XtreamService.splitYear(XtreamService.cleanName("┃GR┃ Human.Vapor [ガス人間 ](2026)")).year, 2026)
     }
 
+    func test_releaseFileName_becomesTitleAndYear() {
+        XCTAssertEqual(XtreamService.splitYear("lights.out.2024.1080p.web.h264-cbfm").name, "Lights Out")
+        XCTAssertEqual(XtreamService.splitYear("lights.out.2024.1080p.web.h264-cbfm").year, 2024)
+        XCTAssertEqual(XtreamService.splitYear("left.for.dead.the.ashley.reeves.story.2021.1080p.web.h264-cbfm").name,
+                       "Left for Dead the Ashley Reeves Story")
+        XCTAssertEqual(XtreamService.splitYear("2001.a.space.odyssey.1968.2160p.uhd.bluray.x265").name, "2001 a Space Odyssey")
+        XCTAssertEqual(XtreamService.splitYear("2001.a.space.odyssey.1968.2160p.uhd.bluray.x265").year, 1968)
+        XCTAssertEqual(XtreamService.splitYear("Some_Film_720p_HDTV").name, "Some Film")
+        XCTAssertNil(XtreamService.splitYear("Some_Film_720p_HDTV").year)
+        XCTAssertNil(XtreamService.splitReleaseName("S.W.A.T."))
+        XCTAssertNil(XtreamService.splitReleaseName("Human.Vapor [ガス人間 ](2026)"))
+        XCTAssertNil(XtreamService.splitReleaseName("1917"))
+        let parsed = XtreamService.movies(from: try! JSONSerialization.jsonObject(
+            with: Data(#"[{"stream_id": 1, "name": "martin.1978.1080p.bluray.x264-jrp"}]"#.utf8)))
+        XCTAssertEqual(parsed.first?.name, "Martin")
+        XCTAssertEqual(parsed.first?.year, 1978)
+    }
+
     func test_episodeTitle_withoutTagsShowAndNumber() {
         XCTAssertEqual(XtreamVODMapping.episodeTitle("| LINGO |   Breaking Bad - S01E01 - Pilot"), "Pilot")
         XCTAssertEqual(XtreamVODMapping.episodeTitle("┃NL┃ S.W.A.T. - S02E10 - Fallen"), "Fallen")
