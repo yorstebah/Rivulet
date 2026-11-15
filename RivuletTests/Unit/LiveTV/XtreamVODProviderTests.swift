@@ -240,6 +240,14 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertEqual(FakePanel.requests.filter { $0 == "get_vod_info" }.count, 2)
     }
 
+    func test_aCategory_takesTheFirstPosterAmongItsTitles() {
+        let heat = URL(string: "http://img.example/heat.jpg")
+        let posters = XtreamVODProvider.firstPosters([("1", nil), ("1", heat), ("2", nil), (nil, heat)])
+        XCTAssertEqual(posters["1"], .some(heat))
+        XCTAssertEqual(posters["2"], .some(nil))
+        XCTAssertEqual(posters.count, 2)
+    }
+
     func test_series_seasonsWithEpisodesOnly_andEpisodesInOrder() async throws {
         let provider = provider()
         let seasons = try await provider.children(of: ref(.series("70")))

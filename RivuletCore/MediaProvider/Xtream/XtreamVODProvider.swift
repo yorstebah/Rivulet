@@ -276,19 +276,29 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         switch XtreamVODLibrary(rawValue: library.id) {
         case .movies:
             let lists = try await catalog.shownMovieLists()
-            let posters = Dictionary(lists.titles.compactMap { movie in movie.categoryId.map { ($0, movie.posterURL) } },
-                                     uniquingKeysWith: { first, _ in first })
+            let posters = Self.firstPosters(lists.titles.map { ($0.categoryId, $0.posterURL) })
             return lists.categories.filter { posters[$0.id] != nil }
                 .map { XtreamVODMapping.item($0, library: .movies, poster: posters[$0.id] ?? nil, provider: id) }
         case .series:
             let lists = try await catalog.shownSeriesLists()
-            let posters = Dictionary(lists.titles.compactMap { show in show.categoryId.map { ($0, show.coverURL) } },
-                                     uniquingKeysWith: { first, _ in first })
+            let posters = Self.firstPosters(lists.titles.map { ($0.categoryId, $0.coverURL) })
             return lists.categories.filter { posters[$0.id] != nil }
                 .map { XtreamVODMapping.item($0, library: .series, poster: posters[$0.id] ?? nil, provider: id) }
         case nil:
             return []
         }
+    }
+
+    /// Each category that holds a title, with the first poster among its titles: the first
+    /// title has none when the panel has not filled in what it added last. nil for a category
+    /// whose titles have no poster at all.
+    static func firstPosters(_ titles: [(category: String?, poster: URL?)]) -> [String: URL?] {
+        var posters: [String: URL?] = [:]
+        for title in titles {
+            guard let category = title.category else { continue }
+            if posters[category] == nil || posters[category] == .some(nil) { posters[category] = title.poster }
+        }
+        return posters
     }
 
     func children(of itemRef: MediaItemRef) async throws -> [MediaItem] {
