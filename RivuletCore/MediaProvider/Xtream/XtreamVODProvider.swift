@@ -105,6 +105,33 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         await MainActor.run { keys.forEach { watchStore().markUnwatched($0) } }
     }
 
+    /// A film's place goes; for an episode, the place in every episode of its series, since
+    /// the row shows one per series and the next one begun would take its spot. Panels have
+    /// no Next Up for a cleared episode to move to, so episodes can go too.
+    func removeFromContinueWatching(_ item: MediaItem) async throws {
+        let source = id
+        switch XtreamVODID(itemID: item.ref.itemID) {
+        case .movie:
+            guard let key = key(for: item.ref) else { return }
+            await MainActor.run { watchStore().clearResumePoints([key]) }
+        case .episode(let seriesID, _):
+            await MainActor.run {
+                let store = watchStore()
+                let keys = store.records.keys.filter { key in
+                    if case .episode(let series, _) = XtreamVODMapping.id(fromKey: key, source: source) { return series == seriesID }
+                    return false
+                }
+                store.clearResumePoints(Array(keys))
+            }
+        default:
+            return
+        }
+    }
+
+    func canRemoveFromContinueWatching(_ item: MediaItem) -> Bool {
+        item.kind == .movie || item.kind == .episode
+    }
+
     func updateProgress(_ itemRef: MediaItemRef, position: TimeInterval) async throws {
         guard let key = key(for: itemRef) else { return }
         let runtime = runtimes.withLock { $0[itemRef.itemID] }
@@ -546,7 +573,12 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     /// Titles with a resume point on this source, watched last first.
     func continueWatching(limit: Int) async throws -> [MediaItem] {
         let keys = await MainActor.run { watchStore().inProgress(limit: limit) }
-        let ids = keys.compactMap { XtreamVODMapping.id(fromKey: $0, source: id) }
+        // One episode per series, the one watched last: the row is newest first.
+        var seriesSeen = Set<String>()
+        let ids = keys.compactMap { XtreamVODMapping.id(fromKey: $0, source: id) }.filter { itemID in
+            guard case .episode(let seriesID, _) = itemID else { return true }
+            return seriesSeen.insert(seriesID).inserted
+        }
         guard !ids.isEmpty else { return [] }
         let state = await state()
         var items: [MediaItem] = []

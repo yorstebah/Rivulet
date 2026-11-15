@@ -305,6 +305,32 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertEqual(after.map(\.title), ["Up"])
     }
 
+    func test_continueWatching_oneEpisodePerSeries_andRemovingTakesTheSeriesOff() async throws {
+        let provider = provider()
+        try await provider.updateProgress(ref(.episode(seriesID: "70", episodeID: "701")), position: 600)
+        try await Task.sleep(for: .milliseconds(10))
+        try await provider.updateProgress(ref(.episode(seriesID: "70", episodeID: "702")), position: 700)
+        try await provider.updateProgress(ref(.movie("11")), position: 600)
+
+        let continuing = try await provider.continueWatching(limit: 10)
+        // The episode watched last stands for its series.
+        XCTAssertEqual(Set(continuing.map(\.title)), ["The Detail", "Up"])
+        let episode = try XCTUnwrap(continuing.first { $0.kind == .episode })
+        XCTAssertTrue(provider.canRemoveFromContinueWatching(episode))
+
+        try await provider.removeFromContinueWatching(episode)
+        // The older episode does not take its place.
+        let afterEpisode = try await provider.continueWatching(limit: 10)
+        XCTAssertEqual(afterEpisode.map(\.title), ["Up"])
+        let film = try XCTUnwrap(continuing.first { $0.kind == .movie })
+        try await provider.removeFromContinueWatching(film)
+        let afterFilm = try await provider.continueWatching(limit: 10)
+        XCTAssertTrue(afterFilm.isEmpty)
+        // Removed, not watched.
+        let records = await MainActor.run { store.records.values.map(\.watched) }
+        XCTAssertFalse(records.contains(true))
+    }
+
     func test_favorites_markedOnTheDevice_listedByTitle_andRowsOnTheLibraryPage() async throws {
         let provider = provider()
         let movies = try await provider.libraries()[0]

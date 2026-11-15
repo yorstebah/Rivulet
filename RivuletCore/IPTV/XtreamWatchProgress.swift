@@ -95,6 +95,18 @@ final class XtreamWatchProgressStore: ObservableObject {
         save()
     }
 
+    /// Takes titles off Continue Watching: their place goes, watched stays. A record is kept,
+    /// newer, so iCloud carries the removal to the other devices (see `markUnwatched`).
+    func clearResumePoints(_ keys: [String], now: Date = Date()) {
+        var changed = false
+        for key in keys {
+            guard let record = records[key], record.position > 0 else { continue }
+            records[key] = XtreamWatchRecord(position: 0, duration: record.duration, watched: record.watched, updatedAt: now)
+            changed = true
+        }
+        if changed { save() }
+    }
+
     /// Titles with a resume point, last watched first: the Continue Watching row.
     func inProgress(limit: Int = 30) -> [String] {
         records
