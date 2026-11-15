@@ -234,7 +234,7 @@ final class LiveChannelRowCell: UICollectionViewCell {
         logoView.image = nil
         guard let url else { return }
         logoTask = Task { [weak self] in
-            let image = await ImageCacheManager.shared.image(for: url, quality: .logo)?.legibleChannelLogo
+            let image = await UIImage.legibleChannelLogo(for: url)
             // A reused cell may show another channel by now.
             guard let self, !Task.isCancelled, self.logoURL == url else { return }
             self.logoView.image = image
