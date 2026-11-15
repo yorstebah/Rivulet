@@ -257,6 +257,8 @@ final class LiveTVAetherPlayerViewController: UIViewController {
     // confirm, a click moves it by a step, and Back or a few idle seconds
     // drop it. Playback never moves until it is confirmed.
     private let timelinePan = LiveTimelineScrubPan()
+    /// A swipe on the timeline while the channel plays: the same as a tap (Right opens the guide).
+    private var timelineSwipeBinding: DirectionalInputBinding?
     private var touchScrub = LiveTimelineScrub()
     /// Seconds behind live the drag is showing, while it is up or held.
     private var touchScrubBehind: Double?
@@ -950,11 +952,23 @@ final class LiveTVAetherPlayerViewController: UIViewController {
         scrubberProxy.onSkip = { [weak self] forward in self?.timelineTap(forward: forward) }
         scrubberProxy.onShuttle = { [weak self] forward in self?.timelineArrow(forward: forward) }
         scrubberProxy.onSelect = { [weak self] in self?.timelineSelected() }
+        // Dragging along the timeline only once paused, as in Apple's player: while the
+        // channel plays a swipe is a tap (Right opens the guide), and holding still shuttles.
         timelinePan.isEnabled = { [weak self] in
-            guard let self, self.scrubberProxy.isFocused, self.activePanel == nil,
+            guard let self, self.isUserPaused, self.scrubberProxy.isFocused, self.activePanel == nil,
                   self.lastResortPlayer == nil else { return false }
             return self.aetherPlayer?.liveTimeshift.seekableRange != nil
         }
+        timelineSwipeBinding = DirectionalInputBinding(
+            gatedSwipesOn: view,
+            directions: [.right],
+            shouldHandle: { [weak self] _ in
+                guard let self else { return false }
+                return !self.isUserPaused && self.scrubberProxy.isFocused && self.activePanel == nil
+                    && self.guideOverlay == nil && self.scrubTarget == nil && !self.touchScrubPending
+            },
+            onSwipe: { [weak self] _ in self?.timelineTap(forward: true) }
+        )
         timelinePan.began = { [weak self] in self?.touchScrubBegan() }
         timelinePan.changed = { [weak self] translation, speed in self?.touchScrubChanged(translation, speed: speed) }
         timelinePan.ended = { [weak self] committed in self?.touchScrubEnded(committed: committed) }
