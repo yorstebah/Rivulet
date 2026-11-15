@@ -227,6 +227,19 @@ final class XtreamVODProviderTests: XCTestCase {
         XCTAssertEqual(letters.map(\.title), ["#", "H", "U"])
     }
 
+    func test_aFilmListedWithoutAPoster_takesTheOneInItsDetails() async throws {
+        FakePanel.replies["get_vod_info"] = #"{"info": {"movie_image": "http://img.example/details.jpg"}, "movie_data": {}}"#
+        let provider = provider()
+        let movies = try await provider.libraries()[0]
+        let newest = try await provider.items(in: movies, sort: .addedAtDesc, page: Page(offset: 0, limit: 3))
+        let posters = Dictionary(uniqueKeysWithValues: newest.items.map { ($0.title, $0.artwork.poster) })
+        XCTAssertEqual(posters["Up"], URL(string: "http://img.example/details.jpg"))
+        XCTAssertEqual(posters["1917"], URL(string: "http://img.example/details.jpg"))
+        // The panel's own poster stays, and its film is not asked about.
+        XCTAssertEqual(posters["Heat"], URL(string: "http://img.example/heat.jpg"))
+        XCTAssertEqual(FakePanel.requests.filter { $0 == "get_vod_info" }.count, 2)
+    }
+
     func test_series_seasonsWithEpisodesOnly_andEpisodesInOrder() async throws {
         let provider = provider()
         let seasons = try await provider.children(of: ref(.series("70")))

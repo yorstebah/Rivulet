@@ -38,6 +38,8 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
     private let usesCommunityMarkers: @Sendable () -> Bool
     /// The viewer's Trakt recommendations, empty when not signed in; tests pass their own.
     private let traktPicks: @Sendable (TraktClient.Kind) async -> [TraktTitle]
+    /// Posters for the titles a panel lists without one.
+    private let posterFill = XtreamPosterFill()
 
     /// `sourceID` is the Live TV source's ("xtream:<hash>"), which is also a valid provider id.
     init(sourceID: String, displayName: String, account: XtreamAccount,
@@ -173,16 +175,53 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         switch XtreamVODLibrary(rawValue: library.id) {
         case .movies:
             let page = try await catalog.moviePage(sort: sort, page: page)
-            result = (page.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
+            result = (await withPosters(page.items).map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
         case .series:
             let page = try await catalog.seriesPage(sort: sort, page: page)
-            result = (page.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
+            result = (await withCovers(page.items).map { XtreamVODMapping.item($0, provider: id, state: state) }, page.total)
         case nil:
             throw MediaProviderError.notFound
         }
         let end = page.offset + result.items.count
         return PagedResult(items: result.items, total: result.total,
                            nextPage: end < result.total ? Page(offset: end, limit: page.limit) : nil)
+    }
+
+    /// The page's films with a poster where the panel listed none: from the film's details on
+    /// the panel, else TMDB's (with the viewer's key). See `XtreamPosterFill`.
+    private func withPosters(_ movies: [XtreamMovie]) async -> [XtreamMovie] {
+        let missing = movies.filter { $0.posterURL == nil }
+        guard !missing.isEmpty else { return movies }
+        let titles = Dictionary(missing.map { ($0.id, ($0.name, $0.year)) }, uniquingKeysWith: { first, _ in first })
+        let posters = await posterFill.posters(for: missing.map { "movie:\($0.id)" }) { [catalog, tmdb] key in
+            let id = String(key.dropFirst("movie:".count))
+            let info = try? await catalog.movieInfo(id)
+            if let poster = info?.posterURL { return poster }
+            guard let (name, year) = titles[id] else { return nil }
+            return await tmdb.title(.movie, tmdbID: info?.tmdbId, name: name, year: year)?.posterURL
+        }
+        return movies.map { movie in
+            var movie = movie
+            if movie.posterURL == nil { movie.posterURL = posters["movie:\(movie.id)"] }
+            return movie
+        }
+    }
+
+    /// The page's series with a cover where the panel listed none: TMDB's, with the viewer's
+    /// key (a series' details on the panel carry every episode, too much to ask per tile).
+    private func withCovers(_ series: [XtreamSeries]) async -> [XtreamSeries] {
+        let missing = series.filter { $0.coverURL == nil }
+        guard !missing.isEmpty, await tmdb.hasKey() else { return series }
+        let titles = Dictionary(missing.map { ($0.id, ($0.name, $0.year)) }, uniquingKeysWith: { first, _ in first })
+        let covers = await posterFill.posters(for: missing.map { "series:\($0.id)" }) { [tmdb] key in
+            guard let (name, year) = titles[String(key.dropFirst("series:".count))] else { return nil }
+            return await tmdb.title(.tv, tmdbID: nil, name: name, year: year)?.posterURL
+        }
+        return series.map { show in
+            var show = show
+            if show.coverURL == nil { show.coverURL = covers["series:\(show.id)"] }
+            return show
+        }
     }
 
     /// Unwatched: films not watched to the end (one begun still counts), and series with no
@@ -203,10 +242,10 @@ final class XtreamVODProvider: MediaProvider, @unchecked Sendable {
         switch XtreamVODLibrary(rawValue: library.id) {
         case .movies:
             let found = try await catalog.moviePage(sort: sort, page: page, excluding: watched)
-            result = (found.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, found.total)
+            result = (await withPosters(found.items).map { XtreamVODMapping.item($0, provider: id, state: state) }, found.total)
         case .series:
             let found = try await catalog.seriesPage(sort: sort, page: page, excluding: watched)
-            result = (found.items.map { XtreamVODMapping.item($0, provider: id, state: state) }, found.total)
+            result = (await withCovers(found.items).map { XtreamVODMapping.item($0, provider: id, state: state) }, found.total)
         case nil:
             throw MediaProviderError.notFound
         }

@@ -26,7 +26,8 @@ nonisolated struct XtreamMovie: Sendable, Equatable, Codable {
     let id: String
     let name: String
     let categoryId: String?
-    let posterURL: URL?
+    /// nil for what a panel added last, until it fills the details in (`XtreamPosterFill`).
+    var posterURL: URL?
     /// Out of 10.
     let rating: Double?
     let addedAt: Date?
@@ -57,7 +58,8 @@ nonisolated struct XtreamSeries: Sendable, Equatable, Codable {
     let id: String
     let name: String
     let categoryId: String?
-    let coverURL: URL?
+    /// As `XtreamMovie.posterURL`.
+    var coverURL: URL?
     let backdropURL: URL?
     let plot: String?
     let genre: String?
