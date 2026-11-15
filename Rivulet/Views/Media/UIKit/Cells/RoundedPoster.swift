@@ -63,6 +63,9 @@ nonisolated enum RoundedPoster {
         let format = UIGraphicsImageRendererFormat()
         format.scale = shape.scale
         format.opaque = false
+        // 8-bit, whatever the source: an HDR or wide-colour poster otherwise renders to a float
+        // bitmap, and the focus stack's shadow pass (vImageConvert_ARGBFFFFtoPlanarF) crashes on it.
+        format.preferredRange = .standard
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
             UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: radius).addClip()
             let srcW = CGFloat(source.width), srcH = CGFloat(source.height)
