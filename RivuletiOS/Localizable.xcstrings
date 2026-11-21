@@ -1,58 +1,88 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Refresh Guide" : {},
-    "Refreshing Guide…" : {},
-    "Refresh Movies and TV Shows" : {},
-    "Refresh Movies and TV Shows Now" : {},
-    "Refreshing Movies and TV Shows…" : {},
-    "Every 6 Hours" : {},
-    "Every 12 Hours" : {},
-    "Daily" : {},
-    "Every 3 Days" : {},
-    "Weekly" : {},
-    "Every %lld Hours" : {},
-    "How often the films and series of every Xtream source are fetched again. Off keeps them until you refresh them here." : {},
-    "Loading channels" : {},
-    "Loading films" : {},
-    "Loading guide" : {},
-    "Loading series" : {},
-    "Processing…" : {},
-    "%@ (List)" : {},
-    "Code" : {},
-    "Connect to Trakt" : {},
-    "Couldn’t reach Trakt. Check your connection and try again." : {},
-    "Open Trakt" : {},
-    "Rivulet tells Trakt what you start, pause and finish, and adds Trakt’s picks to For You in Xtream films and series. Your Trakt sign-in is shared with your other devices through iCloud Sync." : {},
-    "Send What You Watch" : {},
-    "Sign Out of Trakt?" : {},
-    "The code expired. Try again." : {},
-    "The code was not accepted. Try again." : {},
-    "Trakt" : {},
-    "Turn a server off if it already reports to Trakt itself, or every play counts twice. Xtream series need a TMDB key to be recognised." : {},
-    "Add to List" : {},
-    "Africa" : {},
-    "All Languages" : {},
-    "Any" : {},
     "Asia" : {},
-    "Choices of one kind widen the list; different kinds narrow it." : {},
-    "Choose at least one rule." : {},
-    "Content Languages" : {},
-    "Country or Language" : {},
-    "Delete Smart List" : {},
-    "Delete Smart List?" : {},
-    "Delete “%@”…" : {},
-    "Each title shows once, in the first of your languages it has." : {},
-    "Edit Smart List" : {},
-    "Edit “%@”…" : {},
-    "Ex-Yugoslav" : {},
-    "For You picks channels from what you watch. With iCloud sync on, it learns across your devices." : {},
-    "International" : {},
-    "Its channels stay where they are." : {},
-    "Language" : {},
+    "Any" : {},
+    "All Languages" : {},
+    "Africa" : {},
+    "Add to List" : {},
+    "%@ (List)" : {},
+    "Aspect Ratio" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seitenverhältnis"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Αναλογία διαστάσεων"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format d’image"
+          }
+        }
+      }
+    },
     "Languages" : {},
-    "List" : {},
+    "Language" : {},
+    "Its channels stay where they are." : {},
+    "International" : {},
+    "How often the films and series of every Xtream source are fetched again. Off keeps them until you refresh them here." : {},
+    "For You picks channels from what you watch. With iCloud sync on, it learns across your devices." : {},
+    "Fills in intro, recap and credits markers your server is missing, from introdb.app and TheIntroDB.org. Only the show’s IMDb, TMDB or TVDB ID and the episode number are sent." : {},
+    "Ex-Yugoslav" : {},
+    "Every 6 Hours" : {},
+    "Every 3 Days" : {},
+    "Every 12 Hours" : {},
+    "Every %lld Hours" : {},
+    "Edit “%@”…" : {},
+    "Edit Smart List" : {},
+    "Each title shows once, in the first of your languages it has." : {},
+    "Delete “%@”…" : {},
+    "Delete Smart List?" : {},
+    "Delete Smart List" : {},
+    "Daily" : {},
+    "Country or Language" : {},
+    "Couldn’t reach Trakt. Check your connection and try again." : {},
+    "Content Languages" : {},
+    "Connect to Trakt" : {},
+    "Code" : {},
+    "Choose at least one rule." : {},
+    "Choices of one kind widen the list; different kinds narrow it." : {},
+    "Leave a Tip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trinkgeld geben"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Άφησε φιλοδώρημα"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laisser un pourboire"
+          }
+        }
+      }
+    },
+    "Loading series" : {},
+    "Loading guide" : {},
+    "Loading films" : {},
+    "Loading channels" : {},
     "List Name" : {},
+    "List" : {},
     "Map" : {
       "localizations" : {
         "de" : {
@@ -69,18 +99,18 @@
         }
       }
     },
-    "Movies and TV Shows" : {},
-    "Multi" : {},
-    "Multi first, then your device's languages, then English." : {},
-    "Multilingual" : {},
-    "My Languages" : {},
-    "Name Contains" : {},
-    "Name Contains “%@”" : {},
-    "New List" : {},
-    "New List…" : {},
-    "New Smart List" : {},
-    "New Smart List…" : {},
     "Next: %@ at %@" : {},
+    "New Smart List…" : {},
+    "New Smart List" : {},
+    "New List…" : {},
+    "New List" : {},
+    "Name Contains “%@”" : {},
+    "Name Contains" : {},
+    "My Languages" : {},
+    "Multilingual" : {},
+    "Multi first, then your device's languages, then English." : {},
+    "Multi" : {},
+    "Movies and TV Shows" : {},
     "On This Day" : {
       "localizations" : {
         "de" : {
@@ -98,6 +128,7 @@
       }
     },
     "Original Version" : {},
+    "Open Trakt" : {},
     "Photos from %@" : {
       "localizations" : {
         "de" : {
@@ -114,11 +145,112 @@
         }
       }
     },
-    "Rename List" : {},
-    "Rename “%@”…" : {},
+    "Playing away from home needs a Plex Pass or Remote Watch Pass." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für die Wiedergabe außer Haus brauchst du einen Plex Pass oder Remote Watch Pass."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Η αναπαραγωγή εκτός σπιτιού απαιτεί Plex Pass ή Remote Watch Pass."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La lecture hors de chez vous nécessite un Plex Pass ou un Remote Watch Pass."
+          }
+        }
+      }
+    },
+    "Plays surround soundtracks as stereo with the subwoofer channel mixed into left and right, for 2.1 speakers on a stereo connection." : {},
+    "Processing…" : {},
+    "Recording in Progress" : {
+
+    },
     "Restore Defaults" : {},
-    "Save" : {},
+    "Rename “%@”…" : {},
+    "Rename List" : {},
+    "Refreshing Movies and TV Shows…" : {},
+    "Refreshing Guide…" : {},
+    "Refresh Movies and TV Shows Now" : {},
+    "Refresh Movies and TV Shows" : {},
+    "Refresh Guide" : {},
+    "Rivulet is free and open source. A tip helps keep it going." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rivulet ist kostenlos und Open Source. Ein Trinkgeld hilft, es am Leben zu halten."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Το Rivulet είναι δωρεάν και ανοιχτού κώδικα. Ένα φιλοδώρημα το βοηθά να συνεχίσει."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rivulet est gratuit et open source. Un pourboire l’aide à continuer."
+          }
+        }
+      }
+    },
+    "Send What You Watch" : {},
     "Search Channels" : {},
+    "Save" : {},
+    "Rivulet tells Trakt what you start, pause and finish, and adds Trakt’s picks to For You in Xtream films and series. Your Trakt sign-in is shared with your other devices through iCloud Sync." : {},
+    "Server Can't Play This" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vom Server nicht abspielbar"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν μπορεί να το αναπαράγει"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture refusée par le serveur"
+          }
+        }
+      }
+    },
+    "Server Is Converting" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server wandelt um"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής κάνει μετατροπή"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversion par le serveur"
+          }
+        }
+      }
+    },
+    "Sign Out of Trakt?" : {},
     "Slideshow" : {
       "localizations" : {
         "de" : {
@@ -151,8 +283,368 @@
         }
       }
     },
+    "Start from Beginning" : {
+
+    },
+    "Stereo with Subwoofer" : {},
+    "Still Waiting on the Server" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warten auf den Server"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Αναμονή για τον διακομιστή"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente du serveur"
+          }
+        }
+      }
+    },
     "TMDB API Key" : {},
+    "The App Store couldn't be reached. Try again later." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der App Store ist nicht erreichbar. Versuche es später erneut."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Δεν ήταν δυνατή η σύνδεση με το App Store. Δοκίμασε ξανά αργότερα."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de joindre l’App Store. Réessayez plus tard."
+          }
+        }
+      }
+    },
+    "Thank You" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danke"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ευχαριστούμε"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merci"
+          }
+        }
+      }
+    },
     "The provider's films and series appear as Movies and TV Shows libraries. With your own free key from themoviedb.org, their pages show the plot in your language, the cast with photos and more." : {},
+    "The code was not accepted. Try again." : {},
+    "The code expired. Try again." : {},
+    "The server can't find this video's file. It may have been moved or deleted." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server findet die Datei dieses Videos nicht. Sie wurde vielleicht verschoben oder gelöscht."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν βρίσκει το αρχείο αυτού του βίντεο. Ίσως μετακινήθηκε ή διαγράφηκε."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur ne trouve pas le fichier de cette vidéo. Il a peut-être été déplacé ou supprimé."
+          }
+        }
+      }
+    },
+    "The server can't play or convert this video for this device." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server kann dieses Video für dieses Gerät weder abspielen noch umwandeln."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν μπορεί να αναπαράγει ή να μετατρέψει αυτό το βίντεο για αυτή τη συσκευή."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur ne peut ni lire ni convertir cette vidéo pour cet appareil."
+          }
+        }
+      }
+    },
+    "The server can't play this video." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server kann dieses Video nicht abspielen."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν μπορεί να αναπαράγει αυτό το βίντεο."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur ne peut pas lire cette vidéo."
+          }
+        }
+      }
+    },
+    "The server can't play this video: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server kann dieses Video nicht abspielen: %@"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν μπορεί να αναπαράγει αυτό το βίντεο: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur ne peut pas lire cette vidéo : %@"
+          }
+        }
+      }
+    },
+    "The server doesn't let this account play this video." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server erlaubt diesem Konto nicht, dieses Video abzuspielen."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν επιτρέπει σε αυτόν τον λογαριασμό να αναπαράγει αυτό το βίντεο."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur n’autorise pas ce compte à lire cette vidéo."
+          }
+        }
+      }
+    },
+    "The server is at its stream limit. Try again in a moment." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server hat sein Stream-Limit erreicht. Versuche es gleich noch einmal."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής έφτασε στο όριο ροών του. Δοκίμασε ξανά σε λίγο."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur a atteint sa limite de flux. Réessayez dans un instant."
+          }
+        }
+      }
+    },
+    "The server is converting this at %@×, slower than it plays." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server wandelt dies mit %@× um, langsamer als die Wiedergabe."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής το μετατρέπει με %@×, πιο αργά από την αναπαραγωγή."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur le convertit à %@×, plus lentement que la lecture."
+          }
+        }
+      }
+    },
+    "The server is converting this, but it is slow to arrive." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server wandelt dies um, aber es kommt nur langsam an."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής το μετατρέπει, αλλά φτάνει αργά."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur le convertit, mais il arrive lentement."
+          }
+        }
+      }
+    },
+    "The server stopped converting this." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server hat die Umwandlung beendet."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής σταμάτησε τη μετατροπή."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur a arrêté la conversion."
+          }
+        }
+      }
+    },
+    "The server won't play this file directly." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server spielt diese Datei nicht direkt ab."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν αναπαράγει απευθείας αυτό το αρχείο."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur ne lit pas ce fichier directement."
+          }
+        }
+      }
+    },
+    "The server won't play this file directly. It's sending %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server spielt diese Datei nicht direkt ab. Er sendet %@."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν αναπαράγει απευθείας αυτό το αρχείο. Στέλνει %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur ne lit pas ce fichier directement. Il l'envoie en %@."
+          }
+        }
+      }
+    },
+    "The server won't play this file directly. It's sending the best quality it allows." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server spielt diese Datei nicht direkt ab. Er sendet die beste erlaubte Qualität."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν αναπαράγει απευθείας αυτό το αρχείο. Στέλνει την καλύτερη ποιότητα που επιτρέπει."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur ne lit pas ce fichier directement. Il envoie la meilleure qualité qu'il autorise."
+          }
+        }
+      }
+    },
+    "The server wouldn't start a stream for this video." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Server hat keinen Stream für dieses Video gestartet."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ο διακομιστής δεν ξεκίνησε ροή για αυτό το βίντεο."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur n’a pas voulu lancer de flux pour cette vidéo."
+          }
+        }
+      }
+    },
+    "Turn a server off if it already reports to Trakt itself, or every play counts twice. Xtream series need a TMDB key to be recognised." : {},
+    "Trakt" : {},
     "Unfavorite" : {
       "localizations" : {
         "de" : {
@@ -217,8 +709,56 @@
         }
       }
     },
-    "Words, separated by commas" : {},
+    "Watch Live" : {
+
+    },
+    "Weekly" : {},
+    "Widescreen" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Breitbild"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ευρεία οθόνη"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écran large"
+          }
+        }
+      }
+    },
     "Your IPTV provider lists films and series once per language. Each title shows once, in the first of your languages it has. Plex, Jellyfin and Emby list a title once with all its languages: Audio Language and Subtitle Language choose there." : {},
+    "Words, separated by commas" : {},
+    "Your tip helps keep Rivulet going." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Trinkgeld hilft, Rivulet am Leben zu halten."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Το φιλοδώρημά σου βοηθά το Rivulet να συνεχίσει."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre pourboire aide Rivulet à continuer."
+          }
+        }
+      }
+    },
     "Z to A" : {
       "localizations" : {
         "de" : {
@@ -479,6 +1019,8 @@
         }
       }
     },
+    "%@ joined" : {},
+    "%@ left" : {},
     "%@ of %@" : {
       "localizations" : {
         "de" : {
@@ -507,6 +1049,9 @@
         }
       }
     },
+    "%@ paused" : {},
+    "%@ pressed play" : {},
+    "%@ skipped" : {},
     "%@ to %@" : {
       "localizations" : {
         "de" : {
@@ -2149,6 +2694,7 @@
         }
       }
     },
+    "Buffering" : {},
     "Browse" : {
       "localizations" : {
         "de" : {
@@ -2601,6 +3147,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir une bibliothèque"
+          }
+        }
+      }
+    },
+    "Choose a Profile on iPhone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil auf dem iPhone wählen"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Επιλογή προφίλ στο iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir un profil sur l’iPhone"
           }
         }
       }
@@ -3219,6 +3787,7 @@
         }
       }
     },
+    "Couldn't Join" : {},
     "Couldn't Load" : {
       "localizations" : {
         "de" : {
@@ -3513,6 +4082,8 @@
         }
       }
     },
+    "Couldn't join that room." : {},
+    "Couldn't reach Watch Together. Check your connection and try again." : {},
     "Couldn't reach that server. Check the address and port." : {
       "localizations" : {
         "de" : {
@@ -3579,6 +4150,7 @@
         }
       }
     },
+    "Couldn't start a room." : {},
     "Couldn't tune this channel." : {
       "localizations" : {
         "de" : {
@@ -4117,6 +4689,7 @@
         }
       }
     },
+    "Different Version" : {},
     "Dismiss" : {
       "localizations" : {
         "de" : {
@@ -4293,6 +4866,7 @@
         }
       }
     },
+    "Doesn't have this title" : {},
     "Download" : {
       "localizations" : {
         "de" : {
@@ -4761,6 +5335,7 @@
         }
       }
     },
+    "Each person streams from their own server. To start a room, open the Watch Together button in the player." : {},
     "Earlier" : {
       "localizations" : {
         "de" : {
@@ -4849,6 +5424,7 @@
         }
       }
     },
+    "Enter the code from the person hosting." : {},
     "Enter the username and password from your provider." : {
       "localizations" : {
         "de" : {
@@ -5013,6 +5589,7 @@
         }
       }
     },
+    "Episode %lld" : {},
     "Episodes" : {
       "localizations" : {
         "de" : {
@@ -5533,7 +6110,28 @@
         }
       }
     },
-    "Fills in intro, recap and credits markers your server is missing, from introdb.app and TheIntroDB.org. Only the show’s IMDb, TMDB or TVDB ID and the episode number are sent." : {},
+    "Fills in intro and credits markers that Plex is missing, from introdb.app. Only the show’s IMDb ID and episode number are sent." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ergänzt Intro- und Abspannmarker, die in Plex fehlen, über introdb.app. Gesendet werden nur die IMDb-ID der Serie und die Folgennummer."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Συμπληρώνει δείκτες εισαγωγής και τίτλων τέλους που λείπουν από το Plex μέσω introdb.app. Αποστέλλονται μόνο το IMDb ID της σειράς και ο αριθμός επεισοδίου."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Complète les repères d’intro et de générique manquants dans Plex, depuis introdb.app. Seuls l’identifiant IMDb de la série et le numéro d’épisode sont envoyés."
+          }
+        }
+      }
+    },
     "Filter" : {
       "localizations" : {
         "de" : {
@@ -5770,6 +6368,7 @@
         }
       }
     },
+    "Get a code to share. Playback pauses here until someone presses play." : {},
     "Go Live" : {
       "localizations" : {
         "de" : {
@@ -6010,6 +6609,7 @@
         }
       }
     },
+    "Here Now" : {},
     "Hero" : {
       "localizations" : {
         "de" : {
@@ -6098,6 +6698,7 @@
         }
       }
     },
+    "Host • %@" : {},
     "How this source appears in Live TV." : {
       "localizations" : {
         "de" : {
@@ -6378,6 +6979,8 @@
         }
       }
     },
+    "Join" : {},
+    "Join a Room" : {},
     "Jellyfin didn't accept that username and password." : {
       "localizations" : {
         "de" : {
@@ -6542,6 +7145,7 @@
         }
       }
     },
+    "Leave Room" : {},
     "Leave the password empty if the user has none." : {
       "localizations" : {
         "de" : {
@@ -6738,6 +7342,7 @@
         }
       }
     },
+    "Loading" : {},
     "Lower" : {
       "localizations" : {
         "de" : {
@@ -7594,6 +8199,8 @@
         }
       }
     },
+    "No room has that code. Rooms end when everyone leaves." : {},
+    "None of your servers have %@." : {},
     "No Subtitles Found" : {
       "localizations" : {
         "de" : {
@@ -7676,6 +8283,7 @@
         }
       }
     },
+    "Not in Your Library" : {},
     "Nothing On Right Now" : {
       "localizations" : {
         "de" : {
@@ -8082,6 +8690,7 @@
         }
       }
     },
+    "Only the host can control playback." : {},
     "Only Plex converts. Jellyfin and Emby always download the original file." : {
       "localizations" : {
         "de" : {
@@ -8574,6 +9183,7 @@
         }
       }
     },
+    "Play Anyway" : {},
     "Play Again" : {
       "localizations" : {
         "de" : {
@@ -9494,6 +10104,7 @@
         }
       }
     },
+    "Ready" : {},
     "Recap" : {
       "localizations" : {
         "de" : {
@@ -9642,6 +10253,7 @@
         }
       }
     },
+    "Reconnecting to Watch Together…" : {},
     "Record" : {
       "localizations" : {
         "de" : {
@@ -10384,6 +10996,8 @@
         }
       }
     },
+    "Room Code" : {},
+    "Room codes have 6 letters and numbers." : {},
     "Rivulet needs %@ Server %lld.%lld.%lld or newer." : {
       "localizations" : {
         "de" : {
@@ -10928,6 +11542,7 @@
         }
       }
     },
+    "Share Code" : {},
     "Shared by %@" : {
       "localizations" : {
         "de" : {
@@ -11116,6 +11731,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Se connecter"
+          }
+        }
+      }
+    },
+    "Sign In on iPhone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf dem iPhone anmelden"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Σύνδεση στο iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se connecter sur l’iPhone"
           }
         }
       }
@@ -11388,6 +12025,7 @@
         }
       }
     },
+    "Sit This One Out" : {},
     "Skip %@" : {
       "localizations" : {
         "de" : {
@@ -11728,6 +12366,7 @@
         }
       }
     },
+    "Start a Room" : {},
     "Starting Soon" : {
       "localizations" : {
         "de" : {
@@ -11750,6 +12389,7 @@
         }
       }
     },
+    "Starting…" : {},
     "Starts %@" : {
       "localizations" : {
         "de" : {
@@ -11794,6 +12434,7 @@
         }
       }
     },
+    "Stay" : {},
     "Stereo" : {
       "localizations" : {
         "de" : {
@@ -12382,6 +13023,7 @@
         }
       }
     },
+    "That room is full or locked." : {},
     "That server has no Dispatcharr sign-in. Clear the username and password." : {
       "localizations" : {
         "de" : {
@@ -14292,6 +14934,8 @@
         }
       }
     },
+    "Watch Together" : {},
+    "Watch Together ended" : {},
     "Watch from Beginning" : {
       "localizations" : {
         "de" : {
@@ -14676,6 +15320,8 @@
         }
       }
     },
+    "Your copy is %lld seconds longer than the room's, so it may not line up." : {},
+    "Your copy is %lld seconds shorter than the room's, so it may not line up." : {},
     "Your provider has blocked this account." : {
       "localizations" : {
         "de" : {
@@ -15577,6 +16223,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@er"
+          }
+        }
+      }
+    },
+    "%lld unwatched episodes" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unwatched episode"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unwatched episodes"
+                }
+              }
+            }
           }
         }
       }

@@ -773,6 +773,7 @@ struct UniversalPlayerView: View {
             if hasStartedPlayback { LiveTVDataStore.shared.endPlaybackGuideHold() }
             // Stop playback first, then detach from Now Playing
             // (audio session must remain active until player stops)
+            WatchTogetherCoordinator.shared.playerClosed(viewModel)
             viewModel.stopPlayback()
             NowPlayingService.shared.detach()
             Task { await viewModel.reportFinalProgress() }
@@ -806,19 +807,6 @@ struct UniversalPlayerView: View {
                             removal: .opacity.animation(.easeOut(duration: 0.5))
                         )
                     )
-            }
-
-            // Compatibility Notice (e.g., DV fallback)
-            if let notice = viewModel.compatibilityNotice {
-                VStack {
-                    HStack {
-                        Spacer()
-                        compatibilityNoticeView(notice)
-                    }
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .zIndex(15)
             }
 
             // Error State. zIndex above the controls overlay so the
@@ -883,27 +871,6 @@ struct UniversalPlayerView: View {
         }
     }
 
-    // MARK: - Compatibility Notice
-
-    private func compatibilityNoticeView(_ message: String) -> some View {
-        Text(message)
-            .font(.callout)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.white.opacity(0.14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 6)
-            )
-            .padding(.trailing, 36)
-            .padding(.top, 24)
-    }
-
     // MARK: - Error View
 
     private func errorView(error: PlayerError) -> some View {
@@ -929,6 +896,8 @@ struct UniversalPlayerView: View {
             return "exclamationmark.triangle.fill"
         case .serverTerminated:
             return "stop.circle.fill"
+        case .serverRefused:
+            return "exclamationmark.icloud.fill"
         case .engineFailure(let kind, _):
             // Reuse the one engine-kind taxonomy instead of opening a third
             // switch over the same strings. "Is this a network thing or a
@@ -966,6 +935,8 @@ struct UniversalPlayerView: View {
             return String(localized: "Playback Error")
         case .serverTerminated:
             return String(localized: "Playback Stopped")
+        case .serverRefused:
+            return String(localized: "Server Can't Play This")
         case .engineFailure(let kind, _):
             switch DirectPlayFailureKind(engineKind: kind) {
             case .network: return String(localized: "Connection Problem")

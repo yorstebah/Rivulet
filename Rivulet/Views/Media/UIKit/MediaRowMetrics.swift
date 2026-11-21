@@ -48,11 +48,6 @@ enum MediaRowMetrics {
         var lockup = Lockup.poster
         /// Growth on focus (width, height), measured on device, tvOS 27.
         var growth = CGSize(width: MediaRowMetrics.focusGrowth, height: MediaRowMetrics.focusGrowth)
-        /// Room under the frame for the focused title and year (`PosterCaptionView`); 0 for tiles with none.
-        var caption: CGFloat = 0
-
-        /// The cell's height: the frame and the caption room under it.
-        var cellHeight: CGFloat { frame.height + caption }
 
         /// Whole points: compositional layout floors a fractional item width,
         /// which would shorten the pitch.
@@ -86,17 +81,13 @@ enum MediaRowMetrics {
     /// 2:3 poster (PosterCell, WatchlistPosterCell, detail Related row).
     static let poster: Tile = {
         let width = gridWidth(columns: posterFullCount)
-        return Tile(art: CGSize(width: width, height: width * 1.5), growth: CGSize(width: 20, height: 30),
-                    caption: posterCaption)
+        return Tile(art: CGSize(width: width, height: width * 1.5), growth: CGSize(width: 20, height: 30))
     }()
-
-    /// Room for the title and year shown under the focused poster or square tile.
-    static let posterCaption: CGFloat = 64
     static let posterWidth = poster.frame.width
     static let posterHeight = poster.frame.height
 
     /// 1:1 square for music (artist/album/track): the poster's grid column.
-    static let music = Tile(art: CGSize(width: poster.art.width, height: poster.art.width), caption: posterCaption)
+    static let music = Tile(art: CGSize(width: poster.art.width, height: poster.art.width))
 
     /// A cast or crew circle over name and subtitle (`CastCell`), the detail page's cast row.
     /// The photo's focus effect is the system's, so the frame is the circle with no growth.
@@ -141,9 +132,6 @@ enum MediaRowMetrics {
     static let liveWidth: CGFloat = 406
     static let liveHeight: CGFloat = 228
     static let liveGap: CGFloat = 40
-    /// The Live TV card (`LiveCardCell`) as a tile, for rows laid out by tile: its frame is
-    /// `liveWidth` by `liveHeight`.
-    static let liveCard = Tile(art: CGSize(width: liveWidth - focusGrowth, height: liveHeight - focusGrowth), lockup: .card)
 
     // MARK: Row chrome (vertical)
 
@@ -178,9 +166,19 @@ enum MediaRowMetrics {
         return (artBelowHeader - half, shelfArtGap - half - headerHeight - artBelowHeader)
     }
 
+    /// Room under a tile for its title line (`PosterCaption`).
+    static let posterCaptionHeight: CGFloat = 36
+    /// Settings → Appearance → Titles Under Posters: every poster row and grid.
+    static let posterTitlesKey = "showPosterTitles"
+    static let posterTitlesDefault = false
+    static var showsPosterTitles: Bool {
+        (UserDefaults.standard.object(forKey: posterTitlesKey) as? Bool) ?? posterTitlesDefault
+    }
+    /// Extra row height for the title line, 0 while the setting is off.
+    static var posterCaptionSpace: CGFloat { showsPosterTitles ? posterCaptionHeight : 0 }
+
     /// Library poster grid: artwork top to the next row's artwork top (Apple's 55 between 390-tall tiles).
-    /// The caption room under each poster adds its height.
-    static var posterGridPitch: CGFloat { poster.art.height + 55 + poster.caption }
+    static var posterGridPitch: CGFloat { poster.art.height + 55 }
 }
 
 extension NSLayoutConstraint {

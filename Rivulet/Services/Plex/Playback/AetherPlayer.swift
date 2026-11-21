@@ -842,9 +842,10 @@ final class AetherPlayer: PlayerProtocol {
 
     /// Live TV load. HLS sources go to AVPlayer directly (`nativeRemoteHLS`), anything else
     /// through the engine's remux. `forceEngineDemux` makes the engine open the playlist, the
-    /// fallback when a server rejects AVPlayer's request pattern.
+    /// fallback when a server rejects AVPlayer's request pattern. `joinsAtRecordingStart` plays a
+    /// Plex recording in progress from its first segment (`LiveRecordingStart`).
     func loadLive(url: URL, headers: [String: String]?, forceEngineDemux: Bool = false,
-                  role: LiveLoadRole = .fullscreen) async throws {
+                  joinsAtRecordingStart: Bool = false, role: LiveLoadRole = .fullscreen) async throws {
         finishAVCapture()
         dropFrameExtractor()
         if role == .fullscreen { startAVCapture(url: url) }
@@ -895,10 +896,16 @@ final class AetherPlayer: PlayerProtocol {
             // Costs rewind depth on short-GOP channels: the playlist caps at 900 segments.
             options.liveJoinProfile = .fastZap
             options.audioDelaySeconds = AudioSync.seconds()
+            options.audioShaping = Self.audioShaping()
             if role == .multiviewSlot {
                 // Field-rate deinterlacing on a quarter-screen tile only
                 // doubles decoder output for nothing.
                 options.deinterlaceFieldRate = .frame
+            }
+            if joinsAtRecordingStart {
+                // #444: play from the recording's first segment; the window reaches back to it.
+                options.liveJoinsAtPlaylistStart = true
+                options.dvrWindowSeconds = 4 * 3600
             }
             if joinsWirelessAudio {
                 // AVPlayer's own start-up wait is what rides out the receiver's
@@ -1026,6 +1033,11 @@ final class AetherPlayer: PlayerProtocol {
     /// ML upscaling of SDR below 1080p (#846); absent = off.
     static let upscaleKey = "upscaleLowResolution"
 
+    /// Stereo with Subwoofer (#614): a stereo fold that keeps the LFE.
+    static func audioShaping() -> AudioShaping {
+        StereoWithSubwoofer.isOn() ? AudioShaping(maxChannels: 2, lfeMixDB: StereoWithSubwoofer.lfeMixDB) : AudioShaping()
+    }
+
     /// Profile 7 FEL composition; absent = on.
     static let dolbyVisionFELKey = "dolbyVisionFEL"
 
@@ -1069,6 +1081,7 @@ final class AetherPlayer: PlayerProtocol {
         startTime: TimeInterval?,
         subtitleLanguageHintsByStreamIndex: [Int: String],
         preferredAudioLanguages: [String] = [],
+        audioStreamIndex: Int? = nil,
         preferredSubtitleLanguages: [String] = [],
         externalSubtitles: [SidecarSubtitle] = [],
         isLive: Bool = false,
@@ -1081,6 +1094,7 @@ final class AetherPlayer: PlayerProtocol {
             partLoad = nil
             try await loadFile(url: url, headers: headers, startTime: startTime,
                                preferredAudioLanguages: preferredAudioLanguages,
+                               audioStreamIndex: audioStreamIndex,
                                preferredSubtitleLanguages: preferredSubtitleLanguages,
                                externalSubtitles: externalSubtitles, isLive: isLive)
             return
@@ -1088,8 +1102,10 @@ final class AetherPlayer: PlayerProtocol {
         partLoad = (headers, preferredAudioLanguages, preferredSubtitleLanguages)
         let (index, offset) = stackedParts.locate(startTime ?? 0)
         partIndex = index
+        // Stream indexes match across the files of one release.
         try await loadFile(url: stackedParts.files[index].url, headers: headers, startTime: offset,
                            preferredAudioLanguages: preferredAudioLanguages,
+                           audioStreamIndex: audioStreamIndex,
                            preferredSubtitleLanguages: preferredSubtitleLanguages,
                            externalSubtitles: stackedParts.files[index].externalSubtitles, isLive: false)
     }
@@ -1107,15 +1123,15 @@ final class AetherPlayer: PlayerProtocol {
         partIndex = index
         engine.prepareForItemReplacement()
         do {
+            // Stream indexes match across the files of one release, so the part opens on the playing audio.
             try await loadFile(url: stack.files[index].url, headers: partLoad.headers, startTime: offset,
-                               preferredAudioLanguages: partLoad.audio,
+                               preferredAudioLanguages: partLoad.audio, audioStreamIndex: audio,
                                preferredSubtitleLanguages: partLoad.subtitles,
                                externalSubtitles: stack.files[index].externalSubtitles, isLive: false)
         } catch {
             // The load already published the failure.
             return
         }
-        // Stream indexes match across the files of one release.
         if let audio, audio != activeAudioTrackId, audioTracks.contains(where: { $0.id == audio }) {
             selectAudioTrack(id: audio)
         }
@@ -1140,6 +1156,7 @@ final class AetherPlayer: PlayerProtocol {
         headers: [String: String]?,
         startTime: TimeInterval?,
         preferredAudioLanguages: [String],
+        audioStreamIndex: Int? = nil,
         preferredSubtitleLanguages: [String],
         externalSubtitles: [SidecarSubtitle],
         isLive: Bool
@@ -1191,8 +1208,11 @@ final class AetherPlayer: PlayerProtocol {
         // The engine takes it only for SDR below 1080p and switches it off if it can't keep up.
         options.upscalesLowResolutionVideo = UserDefaults.standard.bool(forKey: Self.upscaleKey)
         options.audioDelaySeconds = AudioSync.seconds()
+        options.audioShaping = Self.audioShaping()
         // Read ahead as far as the engine's disk budget allows; live sizes its own window.
         if !isLive { options.forwardBufferSegments = .max }
+        // Reopening the same title within the session plays from the segments already fetched.
+        options.retainsSessionCacheAfterStop = true
         // New content, so the previous item's aspect ratio describes nothing.
         // Reset HERE rather than when `currentItem` goes nil: the engine also
         // swaps its player for SAME-content reasons (audio track switch,
@@ -1212,7 +1232,11 @@ final class AetherPlayer: PlayerProtocol {
         userIntendsToPlay = true
         pendingReloadSince = nil
         do {
-            try await engine.load(url: url, startPosition: startTime, options: options)
+            // Opens on the host's audio pick. Switching once the engine lists its tracks rebuilds
+            // the load before its display handshake ends, and the rebuild serves Dolby Vision as
+            // its HDR10 base (#627).
+            try await engine.load(url: url, startPosition: startTime, options: options,
+                                  audioSourceStreamIndex: audioStreamIndex.flatMap { Int32(exactly: $0) })
         } catch {
             // User navigated away / switched items mid-load. Rethrow untouched
             // and stay off errorSubject: wrapping it as PlayerError.loadFailed
@@ -1288,6 +1312,16 @@ final class AetherPlayer: PlayerProtocol {
         let item = CMSyncConvertTime(host, from: CMClockGetHostTimeClock(), to: timebase)
         guard item.isNumeric else { return nil }
         return engine.presentationAxisMap.sourceSeconds(forItemSeconds: item.seconds)
+    }
+
+    /// The playhead on the title's axis, read off the presentation clock: the
+    /// engine's tick is 10 Hz, too coarse for Watch Together. The tick wins when they
+    /// disagree (a seek or a reload is under way).
+    var precisePosition: TimeInterval {
+        let tick = currentTime
+        guard let source = sourceTime(atHostTime: CACurrentMediaTime()),
+              abs(source + partStart - tick) < 1 else { return tick }
+        return source + partStart
     }
 
     /// Hand external metadata (title, artwork, description, genre) to the
@@ -1556,6 +1590,11 @@ final class AetherPlayer: PlayerProtocol {
     /// remote-HLS bypass, or across a channel change.
     func liveThumbnail(atSessionSeconds sessionSeconds: Double, maxWidth: Int = 320) async -> CGImage? {
         await engine.liveScrubThumbnail(atSessionSeconds: sessionSeconds, maxWidth: maxWidth)
+    }
+
+    /// Closes the rewind window's still decoders when a scrub ends; their cached stills stay.
+    func releaseScrubDecoders() {
+        Task { await engine.releaseScrubPreviewDecoders() }
     }
 
     /// The AVPlayer item's seekable window, mirrored by KVO: the getter is a

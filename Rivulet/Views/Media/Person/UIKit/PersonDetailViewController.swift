@@ -125,6 +125,7 @@ final class PersonDetailViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        collectionView.settleFocusScroll()
         loadTask?.cancel()
         loadTask = nil
     }
@@ -216,8 +217,7 @@ final class PersonDetailViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.clipsToBounds = false
-        // The engine's scroll animator would race the subclass's display-link scroll.
-        collectionView.isScrollEnabled = false
+        collectionView.delegate = self
         collectionView.register(PersonHeaderCell.self, forCellWithReuseIdentifier: PersonHeaderCell.reuseID)
         collectionView.register(ShelfRowCell.self, forCellWithReuseIdentifier: ShelfRowCell.reuseID)
         view.addSubview(collectionView)
@@ -267,7 +267,8 @@ final class PersonDetailViewController: UIViewController {
     /// the poster tile and focus-growth padding.
     private func makeShelfSectionLayout() -> NSCollectionLayoutSection {
         let shelfHeaderHeight: CGFloat = 44   // ShelfRowCell.headerHeight
-        let rowHeight = shelfHeaderHeight + MediaRowMetrics.poster.cellHeight + MediaRowMetrics.focusGrowthPadding
+        let rowHeight = shelfHeaderHeight + MediaRowMetrics.posterHeight + MediaRowMetrics.focusGrowthPadding
+            + MediaRowMetrics.posterCaptionSpace
         let size = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1),
                                           heightDimension: .absolute(rowHeight))
         let item = NSCollectionLayoutItem(layoutSize: size)
@@ -326,7 +327,9 @@ final class PersonDetailViewController: UIViewController {
             let poster = innerCV.dequeueReusableCell(withReuseIdentifier: PosterCell.reuseID, for: indexPath) as! PosterCell
             let entries = self.entries(for: section)
             if indexPath.item < entries.count {
-                poster.configure(item: entries[indexPath.item].item)
+                let item = entries[indexPath.item].item
+                poster.configure(item: item)
+                poster.setCaption(MediaRowMetrics.showsPosterTitles ? PosterCaption.text(for: item) : nil)
             }
             return poster
         }
@@ -345,7 +348,8 @@ final class PersonDetailViewController: UIViewController {
             realCount: entries.count,
             hasSkeleton: false,
             contentToken: contentToken(for: entries),
-            initialOffset: shelfOffsets[section] ?? 0)
+            initialOffset: shelfOffsets[section] ?? 0,
+            captionHeight: MediaRowMetrics.posterCaptionSpace)
     }
 
     private func entries(for section: Section) -> [FilmographyEntry] {
@@ -459,5 +463,28 @@ final class PersonDetailViewController: UIViewController {
         let content = InfoPopupContent.description(title: detail.name, subtitle: nil, body: bio)
         let popup = InfoPopupViewController(content: content, width: InfoPopupViewController.descriptionSize.width, height: InfoPopupViewController.descriptionSize.height, scrollable: true)
         present(popup, animated: true)
+    }
+}
+
+extension PersonDetailViewController: UICollectionViewDelegate {
+    func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint,
+                                   targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+        guard scrollView === collectionView else { return }
+        targetContentOffset.pointee = collectionView.focusScrollTarget(proposed: targetContentOffset.pointee)
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        guard scrollView === collectionView else { return }
+        collectionView.endFocusDragging(willDecelerate: decelerate)
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        guard scrollView === collectionView else { return }
+        collectionView.finishFocusScroll()
+    }
+
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        guard scrollView === collectionView else { return }
+        collectionView.finishFocusScroll()
     }
 }

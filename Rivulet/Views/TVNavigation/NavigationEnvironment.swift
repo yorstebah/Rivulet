@@ -31,6 +31,28 @@ enum SidebarTab: Hashable {
     case settings
     /// The profile slot's pill: Select opens Now Playing, never a tab.
     case nowPlaying
+    /// Not a tab: opens the Watch Together code entry, as `.account` opens the profile panel.
+    case watchTogether
+}
+
+extension SidebarTab {
+    /// Coarse, id-free name for crash-report breadcrumbs and tags: no library keys, server ids or names.
+    var diagnosticsLabel: String {
+        switch self {
+        case .account: "account"
+        case .search: "search"
+        case .home: "home"
+        case .discover: "discover"
+        case .watchlist: "watchlist"
+        case .favorites: "favorites"
+        case .library, .providerLibrary: "library"
+        case .playlists: "playlists"
+        case .liveTV: "live_tv"
+        case .settings: "settings"
+        case .nowPlaying: "now_playing"
+        case .watchTogether: "watch_together"
+        }
+    }
 }
 
 // MARK: - Nested Navigation State

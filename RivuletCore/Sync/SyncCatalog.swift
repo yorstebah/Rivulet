@@ -12,13 +12,32 @@ nonisolated enum SyncCatalog {
     static let accountPrintKey = "iCloudAccountPrint"
     static let heldKey = "iCloudSyncHeld"
 
+    /// Whether this build carries the iCloud entitlement. A free Apple ID cannot sign it, and CloudKit
+    /// stops the app as soon as a container is made without it. Read from the provisioning profile
+    /// Xcode embeds; App Store and TestFlight builds carry none and always have the entitlement.
+    static let cloudAvailable: Bool = cloudAvailable(
+        profile: Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")
+            .flatMap { try? Data(contentsOf: $0) })
+
+    /// No profile, or one that cannot be read, counts as available; a readable profile must list
+    /// the iCloud services.
+    static func cloudAvailable(profile: Data?) -> Bool {
+        guard let profile,
+              let start = profile.range(of: Data("<?xml".utf8)),
+              let end = profile.range(of: Data("</plist>".utf8), in: start.lowerBound..<profile.endIndex),
+              let plist = try? PropertyListSerialization.propertyList(
+                  from: profile.subdata(in: start.lowerBound..<end.upperBound), format: nil) as? [String: Any],
+              let entitlements = plist["Entitlements"] as? [String: Any] else { return true }
+        return entitlements["com.apple.developer.icloud-services"] != nil
+    }
+
     static let exactKeys: Set<String> = [
         // Home and Library
         "showHomeHero", "homeHeroContent", "showLibraryHero", "showLibraryRecentRows",
-        "showLibraryRecommendations", "enablePersonalizedRecommendations", "showDiscoverTab", "showWatchlistTab", "showFavoritesTab",
+        "showLibraryRecommendations", "enablePersonalizedRecommendations", "showDiscoverTab", "showWatchlistTab", "showFavoritesTab", "showWatchTogetherTab",
         // Playback
         "autoplayLimit", "autoplayCountdown", "atTheCredits", "promptResumeOrRestart",
-        "continueWatchingInstantResume", "skipPreviewCarousel", "useIntroDB", "cinemaTrailersCount",
+        "continueWatchingInstantResume", "skipPreviewCarousel", "showPosterTitles", "useIntroDB", "cinemaTrailersCount",
         "detailRatingSource", "generatedSubtitlesFallback", "playerShowsClockTimes",
         "showSkipIntro", "showSkipRecap", "showSkipAds",
         "autoSkipIntro", "autoSkipRecap", "autoSkipAds",
@@ -27,9 +46,9 @@ nonisolated enum SyncCatalog {
         "contentFilter.enabled", "contentFilter.profanityStrength", "contentFilter.customWords",
         // Live TV (not recents or event slots: device habit). Viewings are what For You learns
         // from, so it suggests the same on every device.
-        "liveTVLayout", "liveTVKeepPlayingInGuide", "combineLiveTVSources", "confirmExitMultiview",
+        "liveTVLayout", "combineLiveTVSources",
         XtreamVODRefresh.defaultsKey,
-        "liveTVSuggestions", "liveTVFavoriteChannelIds", "liveTVUnfavoritedChannelIds",
+        "liveTVFavoriteChannelIds", "liveTVUnfavoritedChannelIds",
         "liveTVHiddenPlexServers", "liveTVHideJellyfin", "liveTVHideEmby",
         // The viewer's own and smart channel lists, and pinned categories
         channelListsKey, "liveTVPinnedCategories", viewingsKey,
@@ -41,6 +60,8 @@ nonisolated enum SyncCatalog {
         "plexDisabledServers",
         // Photos
         "photoSlideInterval", "photoSlideTransition", "photoSlidePlaysClips",
+        // Music
+        "musicLoudnessLeveling",
     ]
 
     /// Keys stored once per Plex Home profile (`_user_<id>`) or non-Plex server (`_provider_<id>`).

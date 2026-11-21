@@ -3,6 +3,7 @@
 
 import AppKit
 import AVKit
+import Combine
 import SwiftUI
 
 /// The full-window player: the engine surface, captions and overlay controls that hide when the
@@ -27,6 +28,10 @@ struct MacPlayerView: View {
     @State private var showsChapters = false
     @State private var subtitleSearch: SubtitleSearchModel?
     @State private var showsPlaylist = false
+    @State private var showsWatchTogether = false
+    /// A passing note: Watch Together's, or the session's own.
+    @State private var notice: PlaybackNotice?
+    @ObservedObject private var room = WatchTogetherSession.shared
     @AppStorage(SkipLengthKeys.back) private var skipBackSeconds = 10
     @AppStorage(SkipLengthKeys.forward) private var skipForwardSeconds = 30
     @AppStorage(AudioSync.key) private var audioDelayMs = 0
@@ -91,6 +96,34 @@ struct MacPlayerView: View {
         .onReceive(NotificationCenter.default.publisher(for: CaptionAppearance.changedNotification)) { _ in
             captionStyle = CaptionAppearance.current()
         }
+        .overlay(alignment: .top) {
+            if let notice {
+                HStack(spacing: 12) {
+                    Image(systemName: notice.symbol)
+                        .font(.title3.weight(.semibold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(notice.title).font(.callout.weight(.semibold))
+                        if let detail = notice.detail {
+                            Text(detail).font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(maxWidth: 420, alignment: .leading)
+                .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                .padding(.top, 12)
+                .padding(.horizontal, 16)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.9), value: notice)
+        .task {
+            for await text in room.notices.values { show(PlaybackNotice(title: text, symbol: "person.2.fill")) }
+        }
+        .onChange(of: session.notice) { _, notice in
+            if let notice { show(notice, for: 7) }
+        }
         .sheet(item: $subtitleSearch) { model in
             MacSubtitleSearchPane(model: model)
         }
@@ -102,7 +135,7 @@ struct MacPlayerView: View {
     private var isPlaying: Bool { player.state == .playing }
 
     private var isBusy: Bool {
-        session.serverStopReason == nil && (player.state == .idle || player.state == .loading
+        session.isFallingBack || session.serverStopReason == nil && session.serverRefusal?.blocksTranscode != true && (player.state == .idle || player.state == .loading
             || player.isBuffering || (player.isStarting && player.state == .playing))
     }
 
@@ -113,8 +146,15 @@ struct MacPlayerView: View {
             return MacPlayerFailure(message: reason, canRetry: false, title: String(localized: "Playback Stopped"),
                                     systemImage: "stop.circle.fill")
         }
-        guard case .failed(let message) = player.state else { return nil }
-        return MacPlayerFailure(message: message, canRetry: player.canRetry)
+        if session.isFallingBack { return nil }
+        let failed: String? = if case .failed(let message) = player.state { message } else { nil }
+        if let refusal = ServerRefusal.shown(decision: session.serverRefusal, fileIsMissing: session.request.playingFileIsMissing,
+                                             failed: failed != nil) {
+            return MacPlayerFailure(message: refusal.message, canRetry: false, title: String(localized: "Server Can't Play This"),
+                                    systemImage: "exclamationmark.icloud.fill")
+        }
+        guard let failed else { return nil }
+        return MacPlayerFailure(message: failed, canRetry: player.canRetry)
     }
 
     private var contextualAction: MacPlayerContextualAction? {
@@ -195,7 +235,7 @@ struct MacPlayerView: View {
                     scrubValue: $scrubValue,
                     scrubStill: session.scrubStill,
                     onCommit: { time in
-                        Task { await player.seek(to: time) }
+                        controller.seek(to: time)
                         scheduleHide()
                     },
                     onStep: { direction in controller.skip(forward: direction > 0) }
@@ -294,6 +334,12 @@ struct MacPlayerView: View {
                             }
                         }
                     }
+            }
+            iconButton("Watch Together", systemImage: room.code == nil ? "person.2" : "person.2.fill") {
+                showsWatchTogether.toggle()
+            }
+            .popover(isPresented: $showsWatchTogether, arrowEdge: .top) {
+                MacWatchTogetherPane(playback: session)
             }
             iconButton(isFullScreen ? "Exit Full Screen" : "Full Screen",
                        systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
@@ -481,6 +527,15 @@ struct MacPlayerView: View {
         let total = max(0, Int(seconds))
         if total >= 3600 { return String(format: "%d:%02d:%02d", total / 3600, total / 60 % 60, total % 60) }
         return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    /// Shows `text` until `seconds` pass or another note replaces it.
+    private func show(_ shown: PlaybackNotice, for seconds: Int = 4) {
+        notice = shown
+        Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            if notice == shown { notice = nil }
+        }
     }
 }
 

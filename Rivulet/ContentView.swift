@@ -23,12 +23,8 @@ struct ContentView: View {
     @StateObject private var dataStore = PlexDataStore.shared
     @StateObject private var authManager = PlexAuthManager.shared
     @StateObject private var profileManager = PlexUserProfileManager.shared
-    #if DEBUG
-    /// `RIVULET_SPLASH=1` shows the launch splash in a debug build.
-    private static let launchesWithSplash = ProcessInfo.processInfo.environment["RIVULET_SPLASH"] != nil
-    #else
-    private static let launchesWithSplash = true
-    #endif
+    /// Off in a debug build unless `RIVULET_SPLASH` is set (`hold` keeps it up).
+    private static let launchesWithSplash = LaunchSplashAnimation.isWanted
     /// Whether the splash is wanted. Turning false plays its exit; `splashGone` then removes it.
     @State private var showSplash = Self.launchesWithSplash
     @State private var splashGone = !Self.launchesWithSplash
@@ -172,7 +168,7 @@ private struct LaunchSplash: UIViewRepresentable {
     func makeUIView(context: Context) -> LaunchSplashView { LaunchSplashView() }
 
     func updateUIView(_ view: LaunchSplashView, context: Context) {
-        if finished { view.finish(completion: onGone) }
+        if finished, !LaunchSplashAnimation.holdsForDebug { view.finish(completion: onGone) }
     }
 }
 
@@ -192,6 +188,11 @@ private struct AutoPlayLauncherModifier: ViewModifier {
                 if env["RIVULET_AUTOPLAY_LIVE"] != nil {
                     hasLaunched = true
                     Task { await AVKitScrubProbe.runLive(env: env) }
+                    return
+                }
+                if env["RIVULET_WT_JOIN"] != nil {
+                    hasLaunched = true
+                    WatchTogetherCoordinator.shared.debugJoinIfAsked()
                     return
                 }
                 if env["RIVULET_SCRUBPROBE"] != nil {
